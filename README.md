@@ -27,6 +27,9 @@ source venv/bin/activate
 pip install -r requirements.txt
 pip install open-webui
 
+# Optional: Install package in development mode
+pip install -e .
+
 # Install PM2 for process management
 npm install -g pm2
 ```
@@ -130,20 +133,29 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 ### Files Structure
 ```
-├── manage.sh              # Main management script
-├── llm_proxy.py           # LLM proxy server
-├── providers.json         # LLM providers configuration
-├── backends.example.json  # Default backend configurations (for git)
-├── backends.json         # Custom backend configurations (git ignored)
-├── models.example.json   # Legacy model configurations (for git)
-├── models.json           # Legacy model configurations (git ignored)
-├── pg_init.py             # Database initialization utility
-├── init_template.sql      # SQL template with variables
-├── test_llm_proxy.py      # Pytest test suite
-├── ecosystem.config.js    # PM2 configuration (auto-generated)
-├── .env.example          # Environment configuration template
-├── requirements.txt      # Python dependencies
-└── venv/                 # Virtual environment (created by user)
+├── manage.sh                       # Main management script
+├── pyproject.toml                  # Python package configuration
+├── requirements.txt                # Python dependencies
+├── .env.example                   # Environment configuration template
+├── src/                           # Source code (Python package)
+│   └── openwebui_service/
+│       ├── __init__.py            # Package initialization
+│       ├── llm_proxy.py           # LLM proxy server
+│       └── pg_init.py             # Database initialization utility
+├── conf/                          # Configuration files
+│   ├── backends.example.json     # Default backend configurations (for git)
+│   ├── models.example.json       # Legacy model configurations (for git) 
+│   ├── providers.json            # LLM providers configuration
+│   ├── backends.json             # Custom backend configurations (git ignored)
+│   └── models.json               # Legacy model configurations (git ignored)
+├── templates/                     # Template files
+│   └── init_template.sql         # SQL template with variables
+├── tests/                         # Test files
+│   └── test_llm_proxy.py         # Pytest test suite
+├── run/                           # Runtime generated files (git ignored)
+│   ├── init_openwebui_db.sql     # Generated SQL file
+│   └── ecosystem.config.js       # PM2 configuration (auto-generated)
+└── venv/                          # Virtual environment (created by user)
 ```
 
 ## LLM Proxy Features
@@ -164,7 +176,7 @@ The LLM Proxy provides a unified API to multiple AI providers with expandable mo
 ./manage.sh init backends
 ```
 
-**Customize backends in `backends.json`:**
+**Customize backends in `conf/backends.json`:**
 ```json
 {
   "backends": {
@@ -231,7 +243,7 @@ curl -X POST http://localhost:8000/v1/chat/completions \
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 
-# Reload backends after editing backends.json
+# Reload backends after editing conf/backends.json
 curl -X POST http://localhost:8000/admin/reload-backends
 
 # List configured backends
@@ -309,14 +321,14 @@ The script automatically detects PostgreSQL installations:
 pip install pytest pytest-asyncio
 
 # Run all tests
-pytest test_llm_proxy.py -v
+pytest tests/test_llm_proxy.py -v
 
-# Run specific test categories
-pytest test_llm_proxy.py::TestLLMProxy -v          # Unit tests
-pytest test_llm_proxy.py -k "integration" -v       # Integration tests (requires API keys)
+# Run specific test categories  
+pytest tests/test_llm_proxy.py::TestLLMProxy -v          # Unit tests
+pytest tests/test_llm_proxy.py -k "integration" -v       # Integration tests (requires API keys)
 
 # Run tests with coverage
-pytest test_llm_proxy.py --cov=llm_proxy --cov-report=html
+pytest tests/test_llm_proxy.py --cov=llm_proxy --cov-report=html
 ```
 
 ### Test Categories

@@ -15,9 +15,9 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIza...")
 
 # Load backend configurations
 def load_backends() -> Dict[str, Any]:
-    """Load backend configurations from backends.json or backends.example.json"""
-    backends_file = Path("backends.json")
-    example_file = Path("backends.example.json")
+    """Load backend configurations from conf/backends.json or conf/backends.example.json"""
+    backends_file = Path("conf/backends.json")
+    example_file = Path("conf/backends.example.json")
     
     if backends_file.exists():
         with open(backends_file, 'r') as f:

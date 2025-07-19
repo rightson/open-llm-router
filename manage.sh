@@ -57,8 +57,10 @@ fi
 # Functions
 generate_sql() {
     echo "🗄️  Generating SQL from template..."
-    python3 pg_init.py -e .env -o init_openwebui_db.sql
-    echo "✅ SQL file generated: init_openwebui_db.sql"
+    # Ensure run directory exists
+    mkdir -p run
+    python3 -m src.openwebui_service.pg_init -e .env -o run/init_openwebui_db.sql
+    echo "✅ SQL file generated: run/init_openwebui_db.sql"
 }
 
 init_database() {
@@ -67,11 +69,11 @@ init_database() {
     echo "📊 Executing database initialization..."
 
     # Try to run psql
-    if "$PSQL_PATH" -d postgres -f init_openwebui_db.sql; then
+    if "$PSQL_PATH" -d postgres -f run/init_openwebui_db.sql; then
         echo "✅ Database initialized successfully!"
     else
         echo "❌ Failed to execute SQL. Try running manually:"
-        echo "  $PSQL_PATH -d postgres -f init_openwebui_db.sql"
+        echo "  $PSQL_PATH -d postgres -f run/init_openwebui_db.sql"
         exit 1
     fi
 }
@@ -115,8 +117,8 @@ start_llm_proxy() {
     echo "🚀 Starting LLM Proxy..."
     check_dependencies
     
-    if [ ! -f "llm_proxy.py" ]; then
-        echo "❌ llm_proxy.py not found"
+    if [ ! -f "src/openwebui_service/llm_proxy.py" ]; then
+        echo "❌ src/openwebui_service/llm_proxy.py not found"
         exit 1
     fi
     
@@ -128,7 +130,7 @@ start_llm_proxy() {
     echo "📊 Starting proxy on port ${LLM_PROXY_PORT:-8000}"
     
     # Start LLM Proxy with uvicorn
-    exec venv/bin/python -m uvicorn llm_proxy:app --host 0.0.0.0 --port ${LLM_PROXY_PORT:-8000}
+    exec venv/bin/python -m uvicorn src.openwebui_service.llm_proxy:app --host 0.0.0.0 --port ${LLM_PROXY_PORT:-8000}
 }
 
 start_all_services() {
@@ -148,8 +150,11 @@ start_all_services() {
     
     echo "📊 Using database: $(echo $DATABASE_URL | cut -d'@' -f2 2>/dev/null || echo 'configured database')"
     
+    # Ensure run directory exists
+    mkdir -p run
+    
     # Create PM2 ecosystem file
-    cat > ecosystem.config.js << EOF
+    cat > run/ecosystem.config.js << EOF
 module.exports = {
   apps: [
     {
@@ -168,7 +173,7 @@ module.exports = {
     {
       name: 'llm-proxy',
       script: './venv/bin/python',
-      args: '-m uvicorn llm_proxy:app --host 0.0.0.0 --port ${LLM_PROXY_PORT:-8000}',
+      args: '-m uvicorn src.openwebui_service.llm_proxy:app --host 0.0.0.0 --port ${LLM_PROXY_PORT:-8000}',
       env: {
         OPENAI_API_KEY: '${OPENAI_API_KEY:-}',
         GROQ_API_KEY: '${GROQ_API_KEY:-}',
@@ -185,7 +190,7 @@ module.exports = {
 EOF
 
     # Start services
-    pm2 start ecosystem.config.js
+    pm2 start run/ecosystem.config.js
     pm2 save
     
     echo "✅ Services started with PM2:"
@@ -238,43 +243,43 @@ check_status() {
 init_models() {
     echo "🔧 Initializing models configuration..."
     
-    if [ ! -f "models.example.json" ]; then
-        echo "❌ models.example.json not found"
+    if [ ! -f "conf/models.example.json" ]; then
+        echo "❌ conf/models.example.json not found"
         exit 1
     fi
     
-    if [ -f "models.json" ]; then
-        echo "⚠️  models.json already exists. Backup created as models.json.bak"
-        cp models.json models.json.bak
+    if [ -f "conf/models.json" ]; then
+        echo "⚠️  conf/models.json already exists. Backup created as conf/models.json.bak"
+        cp conf/models.json conf/models.json.bak
     fi
     
-    cp models.example.json models.json
-    echo "✅ Copied models.example.json to models.json"
-    echo "📝 Edit models.json to customize your model configurations"
+    cp conf/models.example.json conf/models.json
+    echo "✅ Copied conf/models.example.json to conf/models.json"
+    echo "📝 Edit conf/models.json to customize your model configurations"
 }
 
 init_backends() {
     echo "🔧 Initializing backends configuration..."
     
-    if [ ! -f "backends.example.json" ]; then
-        echo "❌ backends.example.json not found"
+    if [ ! -f "conf/backends.example.json" ]; then
+        echo "❌ conf/backends.example.json not found"
         exit 1
     fi
     
-    if [ -f "backends.json" ]; then
-        echo "⚠️  backends.json already exists. Backup created as backends.json.bak"
-        cp backends.json backends.json.bak
+    if [ -f "conf/backends.json" ]; then
+        echo "⚠️  conf/backends.json already exists. Backup created as conf/backends.json.bak"
+        cp conf/backends.json conf/backends.json.bak
     fi
     
-    cp backends.example.json backends.json
-    echo "✅ Copied backends.example.json to backends.json"
-    echo "📝 Edit backends.json to customize your backend and model configurations"
+    cp conf/backends.example.json conf/backends.json
+    echo "✅ Copied conf/backends.example.json to conf/backends.json"
+    echo "📝 Edit conf/backends.json to customize your backend and model configurations"
     
     # Also migrate models.json if it exists
-    if [ -f "models.json" ]; then
-        echo "⚠️  Found existing models.json - consider migrating to backends.json format"
-        echo "📋 Backup created as models.json.bak.$(date +%s)"
-        cp models.json "models.json.bak.$(date +%s)"
+    if [ -f "conf/models.json" ]; then
+        echo "⚠️  Found existing conf/models.json - consider migrating to conf/backends.json format"
+        echo "📋 Backup created as conf/models.json.bak.$(date +%s)"
+        cp conf/models.json "conf/models.json.bak.$(date +%s)"
     fi
 }
 
@@ -290,7 +295,7 @@ case "${1:-}" in
         else
             generate_sql
             echo "To execute manually:"
-            echo "  $PSQL_PATH -d postgres -f init_openwebui_db.sql"
+            echo "  $PSQL_PATH -d postgres -f run/init_openwebui_db.sql"
         fi
         ;;
     "start")

@@ -5,16 +5,29 @@
 # Virtual environment
 venv/
 
-# Generated files
-init_openwebui_db.sql
-ecosystem.config.js
-models.json
-backends.json
+# Runtime files
+run/
+*.pyc
+
+# Configuration files (user-customizable)
+conf/models.json
+conf/backends.json
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
 
 # Test coverage
 htmlcov/
 .coverage
 .pytest_cache/
+tests/__pycache__/
+
+# Source cache
+src/**/__pycache__/
 
 # Logs
 *.log

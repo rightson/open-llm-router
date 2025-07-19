@@ -1,6 +1,6 @@
 """
 Pytest tests for LLM Proxy API verification
-Tests all providers defined in providers.json
+Tests all backends defined in backends.json
 """
 
 import pytest
@@ -11,22 +11,21 @@ from fastapi.testclient import TestClient
 
 # Import the FastAPI app
 import sys
-sys.path.insert(0, '.')
-from llm_proxy import app
+sys.path.insert(0, '..')
+from src.openwebui_service.llm_proxy import app
 
 class TestLLMProxy:
     """Test suite for LLM Proxy functionality"""
     
     def setup_class(self):
-        """Setup test class with providers configuration"""
+        """Setup test class with backends configuration"""
         self.client = TestClient(app)
         
-        # Load providers configuration
-        with open('providers.json', 'r') as f:
+        # Load backends configuration
+        with open('../conf/backends.json', 'r') as f:
             self.config = json.load(f)
         
-        self.providers = self.config['providers']
-        self.proxy_config = self.config['proxy']
+        self.backends = self.config['backends']
     
     def test_health_endpoint(self):
         """Test the health check endpoint"""
@@ -34,20 +33,20 @@ class TestLLMProxy:
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
     
-    @pytest.mark.parametrize("provider_name", ["openai", "groq", "claude", "gemini"])
-    def test_provider_configuration(self, provider_name):
-        """Test that all providers are properly configured"""
-        assert provider_name in self.providers
-        provider = self.providers[provider_name]
+    @pytest.mark.parametrize("backend_name", ["openai", "groq", "claude", "gemini"])
+    def test_backend_configuration(self, backend_name):
+        """Test that all backends are properly configured"""
+        assert backend_name in self.backends
+        backend = self.backends[backend_name]
         
         # Check required fields
-        required_fields = ["name", "base_url", "api_key_env", "models", "endpoints"]
+        required_fields = ["name", "base_url", "api_key_env", "models"]
         for field in required_fields:
-            assert field in provider, f"Provider {provider_name} missing {field}"
+            assert field in backend, f"Backend {backend_name} missing {field}"
         
-        # Check endpoints structure
-        assert "chat_completions" in provider["endpoints"]
-        assert provider["endpoints"]["chat_completions"] is not None
+        # Check models structure
+        assert isinstance(backend["models"], list)
+        assert len(backend["models"]) > 0
     
     def test_openai_model_routing(self):
         """Test OpenAI model routing logic"""
@@ -60,7 +59,7 @@ class TestLLMProxy:
         
         for model in test_cases:
             # Import the routing function
-            from llm_proxy import choose_backend
+            from src.openwebui_service.llm_proxy import choose_backend
             
             # Mock environment variable
             with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
@@ -76,7 +75,7 @@ class TestLLMProxy:
         ]
         
         for model in test_cases:
-            from llm_proxy import choose_backend
+            from src.openwebui_service.llm_proxy import choose_backend
             
             with patch.dict(os.environ, {'GROQ_API_KEY': 'test-groq-key'}):
                 backend = choose_backend(model)
@@ -91,7 +90,7 @@ class TestLLMProxy:
         ]
         
         for model in test_cases:
-            from llm_proxy import choose_backend
+            from src.openwebui_service.llm_proxy import choose_backend
             
             with patch.dict(os.environ, {'CLAUDE_API_KEY': 'test-claude-key'}):
                 backend = choose_backend(model)
@@ -106,7 +105,7 @@ class TestLLMProxy:
         ]
         
         for model in test_cases:
-            from llm_proxy import choose_backend
+            from src.openwebui_service.llm_proxy import choose_backend
             
             with patch.dict(os.environ, {'GEMINI_API_KEY': 'test-gemini-key'}):
                 backend = choose_backend(model)
@@ -115,7 +114,7 @@ class TestLLMProxy:
     
     def test_unknown_model_error(self):
         """Test that unknown models raise appropriate errors"""
-        from llm_proxy import choose_backend
+        from src.openwebui_service.llm_proxy import choose_backend
         from fastapi import HTTPException
         
         with pytest.raises(HTTPException) as exc_info:
@@ -155,32 +154,27 @@ class TestLLMProxy:
         """Test handling of missing API keys"""        
         with patch.dict(os.environ, {}, clear=True):
             # Test that app still starts but with default values
-            from llm_proxy import OPENAI_API_KEY, GROQ_API_KEY, CLAUDE_API_KEY, GEMINI_API_KEY
+            from src.openwebui_service.llm_proxy import OPENAI_API_KEY, GROQ_API_KEY, CLAUDE_API_KEY, GEMINI_API_KEY
             
             assert OPENAI_API_KEY == "sk-xxxx"  # Default value
             assert GROQ_API_KEY == "gsk-xxxx"   # Default value
             assert CLAUDE_API_KEY == "sk-ant-xxx"  # Default value
             assert GEMINI_API_KEY == "AIza..."   # Default value
     
-    @pytest.mark.parametrize("provider_name", ["openai", "groq", "claude", "gemini"])
-    def test_provider_endpoints_format(self, provider_name):
-        """Test that provider endpoints are correctly formatted"""
-        provider = self.providers[provider_name]
-        base_url = provider["base_url"]
-        endpoints = provider["endpoints"]
+    @pytest.mark.parametrize("backend_name", ["openai", "groq", "claude", "gemini"])
+    def test_backend_endpoints_format(self, backend_name):
+        """Test that backend URLs are correctly formatted"""
+        backend = self.backends[backend_name]
+        base_url = backend["base_url"]
         
-        # Check that chat_completions endpoint is properly formatted
-        chat_endpoint = endpoints["chat_completions"]
-        assert chat_endpoint.startswith("/")
-        
-        # Construct full URL and verify it's valid
-        full_url = base_url + chat_endpoint
-        assert full_url.startswith("http")
+        # Check that base_url is properly formatted
+        assert base_url.startswith("https://")
+        assert "chat/completions" in base_url or "completions" in base_url
     
-    def test_providers_json_structure(self):
-        """Test the overall structure of providers.json"""
+    def test_backends_json_structure(self):
+        """Test the overall structure of backends.json"""
         # Test top-level structure
-        assert "providers" in self.config
+        assert "backends" in self.config
         assert "proxy" in self.config
         
         # Test proxy configuration
@@ -189,14 +183,14 @@ class TestLLMProxy:
         for field in required_proxy_fields:
             assert field in proxy
         
-        # Test that all expected providers exist
-        expected_providers = ["openai", "groq", "claude", "gemini"]
-        for provider in expected_providers:
-            assert provider in self.providers
+        # Test that all expected backends exist
+        expected_backends = ["openai", "groq", "claude", "gemini"]
+        for backend in expected_backends:
+            assert backend in self.backends
     
     def test_model_coverage(self):
         """Test that models from backends.example.json are covered by routing logic"""
-        from llm_proxy import choose_backend, BACKENDS_CONFIG
+        from src.openwebui_service.llm_proxy import choose_backend, BACKENDS_CONFIG
         
         # Test each backend's models from the loaded configuration
         backends = BACKENDS_CONFIG.get("backends", {})
@@ -220,7 +214,7 @@ class TestLLMProxy:
     
     def test_model_aliases(self):
         """Test that model aliases work correctly"""
-        from llm_proxy import get_backend_for_model, BACKENDS_CONFIG
+        from src.openwebui_service.llm_proxy import get_backend_for_model, BACKENDS_CONFIG
         
         model_aliases = BACKENDS_CONFIG.get("model_aliases", {})
         for alias, target_model in model_aliases.items():
@@ -234,7 +228,7 @@ class TestLLMProxy:
     
     def test_backend_headers_template(self):
         """Test that backend headers are properly formatted"""
-        from llm_proxy import choose_backend, BACKENDS_CONFIG
+        from src.openwebui_service.llm_proxy import choose_backend, BACKENDS_CONFIG
         
         backends = BACKENDS_CONFIG.get("backends", {})
         for backend_name, backend_config in backends.items():

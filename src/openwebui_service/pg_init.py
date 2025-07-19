@@ -13,7 +13,7 @@ import argparse
 
 
 class PostgresInitializer:
-    def __init__(self, env_file=".env", template_file="init_template.sql"):
+    def __init__(self, env_file=".env", template_file="templates/init_template.sql"):
         self.env_file = env_file
         self.template_file = template_file
         self.required_vars = [
@@ -71,10 +71,12 @@ class PostgresInitializer:
 
     def write_output(self, sql_content, output_file):
         """Write generated SQL to output file"""
+        # Ensure parent directory exists
+        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(sql_content)
 
-    def run(self, output_file="init_openwebui_db.sql", dry_run=False):
+    def run(self, output_file="run/init_openwebui_db.sql", dry_run=False):
         """Main execution method"""
         # Load environment variables
         env_vars = self.load_environment()
@@ -148,10 +150,11 @@ ALTER DATABASE $OPENWEBUI_DB_NAME OWNER TO $OPENWEBUI_DB_USER;
 \\echo 'Database: $OPENWEBUI_DB_NAME'
 """
 
-    with open("init_template.sql", 'w', encoding='utf-8') as f:
+    Path("templates").mkdir(exist_ok=True)
+    with open("templates/init_template.sql", 'w', encoding='utf-8') as f:
         f.write(template_content)
 
-    print("✓ Created init_template.sql")
+    print("✓ Created templates/init_template.sql")
 
 
 def create_env_example():
@@ -178,13 +181,13 @@ def main():
     )
     parser.add_argument(
         "-o", "--output",
-        default="init_openwebui_db.sql",
-        help="Output SQL file (default: init_openwebui_db.sql)"
+        default="run/init_openwebui_db.sql",
+        help="Output SQL file (default: run/init_openwebui_db.sql)"
     )
     parser.add_argument(
         "-t", "--template",
-        default="init_template.sql",
-        help="SQL template file (default: init_template.sql)"
+        default="templates/init_template.sql",
+        help="SQL template file (default: templates/init_template.sql)"
     )
     parser.add_argument(
         "-e", "--env-file",
