@@ -1,2 +1,13 @@
+# Core dependencies
 python-dotenv>=1.0.0
+
+# LLM Proxy dependencies
+fastapi>=0.100.0
+httpx>=0.24.0
+uvicorn[standard]>=0.23.0
+
+# Testing dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+requests>=2.31.0
 

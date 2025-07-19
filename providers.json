@@ -1,0 +1,44 @@
+{
+  "providers": {
+    "openai": {
+      "name": "OpenAI",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY",
+      "endpoints": {
+        "chat_completions": "/chat/completions",
+        "models": "/models"
+      }
+    },
+    "groq": {
+      "name": "Groq",
+      "base_url": "https://api.groq.com/openai/v1",
+      "api_key_env": "GROQ_API_KEY",
+      "endpoints": {
+        "chat_completions": "/chat/completions",
+        "models": "/models"
+      }
+    },
+    "claude": {
+      "name": "Anthropic Claude",
+      "base_url": "http://localhost:9000/v1",
+      "api_key_env": "CLAUDE_API_KEY",
+      "endpoints": {
+        "chat_completions": "/chat/completions"
+      }
+    },
+    "gemini": {
+      "name": "Google Gemini",
+      "base_url": "http://localhost:9001/v1", 
+      "api_key_env": "GEMINI_API_KEY",
+      "endpoints": {
+        "chat_completions": "/chat/completions"
+      }
+    }
+  },
+  "proxy": {
+    "host": "localhost",
+    "port": 8000,
+    "health_endpoint": "/",
+    "main_endpoint": "/v1/chat/completions"
+  }
+}

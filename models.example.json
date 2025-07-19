@@ -1,0 +1,49 @@
+{
+  "providers": {
+    "openai": {
+      "models": [
+        "gpt-4",
+        "gpt-4-turbo",
+        "gpt-4-turbo-preview",
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-16k"
+      ]
+    },
+    "groq": {
+      "models": [
+        "llama-3.1-70b-versatile",
+        "llama-3.1-8b-instant",
+        "mixtral-8x7b-32768",
+        "gemma-7b-it"
+      ]
+    },
+    "claude": {
+      "models": [
+        "claude-3-5-sonnet-20241022",
+        "claude-3-5-haiku-20241022",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229",
+        "claude-3-opus-20240229"
+      ]
+    },
+    "gemini": {
+      "models": [
+        "gemini-pro",
+        "gemini-pro-vision",
+        "gemini-1.5-pro",
+        "gemini-1.5-flash"
+      ]
+    }
+  },
+  "model_aliases": {
+    "gpt-4o": "gpt-4-turbo",
+    "llama": "llama-3.1-70b-versatile",
+    "claude": "claude-3-5-sonnet-20241022",
+    "gemini": "gemini-pro"
+  },
+  "default_models": {
+    "chat": "gpt-3.5-turbo",
+    "completion": "gpt-3.5-turbo",
+    "embedding": "text-embedding-ada-002"
+  }
+}

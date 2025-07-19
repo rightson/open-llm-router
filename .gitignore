@@ -1,4 +1,24 @@
+# Environment and secrets
 .env
-venv/
 .webui_secret_key
+
+# Virtual environment
+venv/
+
+# Generated files
 init_openwebui_db.sql
+ecosystem.config.js
+models.json
+backends.json
+
+# Test coverage
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Logs
+*.log
+logs/
+
+# PM2
+.pm2/
