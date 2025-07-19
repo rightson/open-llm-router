@@ -1,0 +1,4 @@
+.env
+venv/
+.webui_secret_key
+init_openwebui_db.sql
