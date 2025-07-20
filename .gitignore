@@ -12,6 +12,7 @@ run/
 # Configuration files (user-customizable)
 conf/models.json
 conf/backends.json
+*.bak
 
 # Python cache files
 __pycache__/
