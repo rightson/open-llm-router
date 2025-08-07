@@ -18,7 +18,7 @@ def load_backends() -> Dict[str, Any]:
     """Load backend configurations from conf/backends.json or conf/backends.example.json"""
     backends_file = Path("conf/backends.json")
     example_file = Path("conf/backends.example.json")
-    
+
     if backends_file.exists():
         with open(backends_file, 'r') as f:
             return json.load(f)
@@ -38,7 +38,7 @@ def load_backends() -> Dict[str, Any]:
                     "model_prefixes": ["gpt-"]
                 },
                 "groq": {
-                    "name": "Groq", 
+                    "name": "Groq",
                     "base_url": "https://api.groq.com/openai/v1/chat/completions",
                     "api_key_env": "GROQ_API_KEY",
                     "headers_template": {"Authorization": "Bearer {api_key}"},
@@ -50,7 +50,7 @@ def load_backends() -> Dict[str, Any]:
             "default_models": {"chat": "gpt-3.5-turbo"}
         }
 
-# Load backends configuration at startup  
+# Load backends configuration at startup
 BACKENDS_CONFIG = load_backends()
 
 def get_backend_for_model(model: str) -> str:
@@ -59,21 +59,21 @@ def get_backend_for_model(model: str) -> str:
     model_aliases = BACKENDS_CONFIG.get("model_aliases", {})
     if model in model_aliases:
         model = model_aliases[model]
-    
+
     # Check each backend's models
     backends = BACKENDS_CONFIG.get("backends", {})
     for backend_name, backend_config in backends.items():
         models = backend_config.get("models", [])
         if model in models:
             return backend_name
-    
+
     # Fallback to prefix-based matching for backward compatibility
     for backend_name, backend_config in backends.items():
         model_prefixes = backend_config.get("model_prefixes", [])
         for prefix in model_prefixes:
             if model.startswith(prefix):
                 return backend_name
-    
+
     raise HTTPException(400, f"Unknown model: {model}")
 
 def get_api_key_for_backend(backend_name: str, backend_config: Dict[str, Any]) -> str:
@@ -81,7 +81,7 @@ def get_api_key_for_backend(backend_name: str, backend_config: Dict[str, Any]) -
     api_key_env = backend_config.get("api_key_env")
     if not api_key_env:
         raise HTTPException(500, f"No API key environment variable configured for {backend_name}")
-    
+
     api_key = os.getenv(api_key_env)
     if not api_key:
         # Fallback to legacy environment variables
@@ -92,20 +92,20 @@ def get_api_key_for_backend(backend_name: str, backend_config: Dict[str, Any]) -
             "GEMINI_API_KEY": GEMINI_API_KEY
         }
         api_key = legacy_keys.get(api_key_env, f"default-{backend_name}-key")
-    
+
     return api_key
 
 def choose_backend(model: str):
     """Choose the appropriate backend for the given model"""
     backend_name = get_backend_for_model(model)
     backends = BACKENDS_CONFIG.get("backends", {})
-    
+
     if backend_name not in backends:
         raise HTTPException(400, f"Backend {backend_name} not found in configuration")
-    
+
     backend_config = backends[backend_name]
     api_key = get_api_key_for_backend(backend_name, backend_config)
-    
+
     # Build headers from template
     headers_template = backend_config.get("headers_template", {"Authorization": "Bearer {api_key}"})
     headers = {}
@@ -114,7 +114,7 @@ def choose_backend(model: str):
             headers[key] = value.format(api_key=api_key)
         else:
             headers[key] = value
-    
+
     return {
         "base_url": backend_config["base_url"],
         "api_key": api_key,
@@ -128,9 +128,9 @@ async def proxy_chat_completions(request: Request,
     body = await request.json()
     model = body.get("model", "gpt-3.5-turbo")
 
-    # 簡單的 auth, 可擴充為 JWT、OAuth 或其他
+    # Simple auth, can be expanded to JWT, OAuth, or other methods.
     if authorization not in [f"Bearer {OPENAI_API_KEY}", f"Bearer {GROQ_API_KEY}"]:
-        pass # 可以加入自己的驗證邏輯
+        pass # Add your own authentication logic.
 
     backend = choose_backend(model)
 
@@ -151,7 +151,7 @@ def list_models():
     """List all available models"""
     all_models = []
     backends = BACKENDS_CONFIG.get("backends", {})
-    
+
     for backend_name, backend_config in backends.items():
         models = backend_config.get("models", [])
         for model in models:
@@ -162,7 +162,7 @@ def list_models():
                 "owned_by": backend_config.get("name", backend_name),
                 "backend": backend_name
             })
-    
+
     # Add model aliases
     model_aliases = BACKENDS_CONFIG.get("model_aliases", {})
     for alias, target in model_aliases.items():
@@ -172,7 +172,7 @@ def list_models():
             backend_config = backends.get(backend, {})
             all_models.append({
                 "id": alias,
-                "object": "model", 
+                "object": "model",
                 "created": 1677610602,
                 "owned_by": backend_config.get("name", backend),
                 "backend": backend,
@@ -180,7 +180,7 @@ def list_models():
             })
         except:
             continue
-    
+
     return {
         "object": "list",
         "data": all_models
@@ -200,7 +200,7 @@ def reload_backends():
         }
     except Exception as e:
         return {
-            "status": "error", 
+            "status": "error",
             "message": f"Failed to reload backends: {str(e)}"
         }
 
@@ -214,7 +214,7 @@ def list_backends():
     """List all configured backends (admin endpoint)"""
     backends = BACKENDS_CONFIG.get("backends", {})
     backend_list = []
-    
+
     for backend_name, backend_config in backends.items():
         backend_list.append({
             "name": backend_name,
@@ -224,7 +224,7 @@ def list_backends():
             "models": backend_config.get("models", []),
             "model_prefixes": backend_config.get("model_prefixes", [])
         })
-    
+
     return {
         "backends": backend_list,
         "total_backends": len(backend_list),
