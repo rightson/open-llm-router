@@ -87,7 +87,7 @@ check_dependencies() {
         echo "  pip install -r requirements.txt"
         exit 1
     fi
-    
+
     # Check if PM2 is installed
     if ! command -v pm2 >/dev/null 2>&1; then
         echo "❌ PM2 not found. Install it first:"
@@ -99,47 +99,47 @@ check_dependencies() {
 start_open_webui() {
     echo "🚀 Starting Open-WebUI..."
     check_dependencies
-    
+
     if [ ! -x "venv/bin/open-webui" ]; then
         echo "❌ open-webui not found in virtual environment. Install it first:"
         echo "  source venv/bin/activate"
         echo "  pip install open-webui"
         exit 1
     fi
-    
+
     echo "📊 Using database: $(echo $DATABASE_URL | cut -d'@' -f2 2>/dev/null || echo 'configured database')"
-    
+
     # Start Open-WebUI
-    exec venv/bin/open-webui serve --port $OPENWEBUI_PORT
+    exec venv/bin/open-webui serve --port ${OPENWEBUI_PORT:-8087} --host ${OPENWEBUI_HOST:-localhost}
 }
 
 start_llm_proxy() {
     echo "🚀 Starting LLM Proxy..."
     check_dependencies
-    
+
     if [ ! -f "src/openwebui_service/llm_proxy.py" ]; then
         echo "❌ src/openwebui_service/llm_proxy.py not found"
         exit 1
     fi
-    
+
     # Check required API keys
-    if [ -z "$OPENAI_API_KEY" ] && [ -z "$GROQ_API_KEY" ] && [ -z "$CLAUDE_API_KEY" ] && [ -z "$GEMINI_API_KEY" ]; then
+    if [ -z "$OPENAI_API_KEY" ] && [ -z "$GROK_API_KEY" ] && [ -z "$CLAUDE_API_KEY" ] && [ -z "$GEMINI_API_KEY" ]; then
         echo "⚠️  Warning: No API keys configured. Add at least one API key to .env"
     fi
-    
-    echo "📊 Starting proxy on port ${LLM_PROXY_PORT:-8000}"
-    
+
+    echo "📊 Starting proxy on port ${LLM_PROXY_PORT:-8086}"
+
     # Start LLM Proxy with uvicorn
-    exec venv/bin/python -m uvicorn src.openwebui_service.llm_proxy:app --host 0.0.0.0 --port ${LLM_PROXY_PORT:-8000}
+    exec venv/bin/python -m uvicorn src.openwebui_service.llm_proxy:app --host ${LLM_PROXY_HOST:-localhost} --port ${LLM_PROXY_PORT:-8086}
 }
 
 start_all_services() {
     echo "🚀 Starting all services with PM2..."
     check_dependencies
-    
+
     # Stop existing PM2 processes
     pm2 delete open-webui llm-proxy 2>/dev/null || true
-    
+
     # Start Open-WebUI with PM2
     if [ ! -x "venv/bin/open-webui" ]; then
         echo "❌ open-webui not found in virtual environment. Install it first:"
@@ -147,12 +147,12 @@ start_all_services() {
         echo "  pip install open-webui"
         exit 1
     fi
-    
+
     echo "📊 Using database: $(echo $DATABASE_URL | cut -d'@' -f2 2>/dev/null || echo 'configured database')"
-    
+
     # Ensure run directory exists
     mkdir -p run
-    
+
     # Create PM2 ecosystem file
     cat > run/ecosystem.config.js << EOF
 module.exports = {
@@ -173,10 +173,10 @@ module.exports = {
     {
       name: 'llm-proxy',
       script: './venv/bin/python',
-      args: '-m uvicorn src.openwebui_service.llm_proxy:app --host 0.0.0.0 --port ${LLM_PROXY_PORT:-8000}',
+      args: '-m uvicorn src.openwebui_service.llm_proxy:app --host ${LLM_PROXY_HOST:-localhost} --port ${LLM_PROXY_PORT:-8086}',
       env: {
         OPENAI_API_KEY: '${OPENAI_API_KEY:-}',
-        GROQ_API_KEY: '${GROQ_API_KEY:-}',
+        GROK_API_KEY: '${GROK_API_KEY:-}',
         CLAUDE_API_KEY: '${CLAUDE_API_KEY:-}',
         GEMINI_API_KEY: '${GEMINI_API_KEY:-}',
         NODE_ENV: 'production'
@@ -192,13 +192,13 @@ EOF
     # Start services
     pm2 start run/ecosystem.config.js
     pm2 save
-    
+
     echo "✅ Services started with PM2:"
     pm2 status
     echo ""
     echo "📊 Access points:"
     echo "  Open-WebUI: http://localhost:${OPENWEBUI_PORT:-5487}"
-    echo "  LLM Proxy:  http://localhost:${LLM_PROXY_PORT:-8000}"
+    echo "  LLM Proxy:  http://localhost:${LLM_PROXY_PORT:-8086}"
     echo ""
     echo "PM2 commands:"
     echo "  pm2 status          # Check status"
@@ -242,17 +242,17 @@ check_status() {
 
 init_models() {
     echo "🔧 Initializing models configuration..."
-    
+
     if [ ! -f "conf/models.example.json" ]; then
         echo "❌ conf/models.example.json not found"
         exit 1
     fi
-    
+
     if [ -f "conf/models.json" ]; then
         echo "⚠️  conf/models.json already exists. Backup created as conf/models.json.bak"
         cp conf/models.json conf/models.json.bak
     fi
-    
+
     cp conf/models.example.json conf/models.json
     echo "✅ Copied conf/models.example.json to conf/models.json"
     echo "📝 Edit conf/models.json to customize your model configurations"
@@ -260,21 +260,21 @@ init_models() {
 
 init_backends() {
     echo "🔧 Initializing backends configuration..."
-    
+
     if [ ! -f "conf/backends.example.json" ]; then
         echo "❌ conf/backends.example.json not found"
         exit 1
     fi
-    
+
     if [ -f "conf/backends.json" ]; then
         echo "⚠️  conf/backends.json already exists. Backup created as conf/backends.json.bak"
         cp conf/backends.json conf/backends.json.bak
     fi
-    
+
     cp conf/backends.example.json conf/backends.json
     echo "✅ Copied conf/backends.example.json to conf/backends.json"
     echo "📝 Edit conf/backends.json to customize your backend and model configurations"
-    
+
     # Also migrate models.json if it exists
     if [ -f "conf/models.json" ]; then
         echo "⚠️  Found existing conf/models.json - consider migrating to conf/backends.json format"
@@ -330,7 +330,7 @@ case "${1:-}" in
         echo ""
         echo "Commands:"
         echo "  init              Generate SQL file from template"
-        echo "  init -x           Generate and execute SQL file"  
+        echo "  init -x           Generate and execute SQL file"
         echo "  init models       Initialize models.json from example (legacy)"
         echo "  init backends     Initialize backends.json from example"
         echo "  start             Start all services with PM2"
