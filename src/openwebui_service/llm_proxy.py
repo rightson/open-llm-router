@@ -9,6 +9,17 @@ from pathlib import Path
 from typing import Dict, Any, AsyncGenerator
 import uuid
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    # Load .env from the project root (parent directory)
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    load_dotenv(env_path)
+    logging.info(f"Loaded environment variables from {env_path}")
+except ImportError:
+    logging.warning("python-dotenv not available, relying on system environment variables")
+    pass
+
 app = FastAPI()
 
 # API KEY configuration
@@ -21,12 +32,17 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIza...")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Debug log the API key loading (without exposing the full key)
+logger.info(f"CLAUDE_API_KEY loaded: {'Yes' if CLAUDE_API_KEY and not CLAUDE_API_KEY.startswith('sk-ant-xxx') else 'No'}")
+
 
 # Load backend configurations
 def load_backends() -> Dict[str, Any]:
     """Load backend configurations from conf/backends.json or conf/backends.example.json"""
-    backends_file = Path("conf/backends.json")
-    example_file = Path("conf/backends.example.json")
+    # Use absolute paths from the project root
+    project_root = Path(__file__).parent.parent.parent
+    backends_file = project_root / "conf/backends.json"
+    example_file = project_root / "conf/backends.example.json"
 
     if backends_file.exists():
         with open(backends_file, "r") as f:
@@ -178,15 +194,29 @@ async def handle_claude_request(body, backend, stream):
             f"Converted {len(messages)} messages to {len(anthropic_msgs)} Anthropic messages"
         )
 
-        # Build Claude-specific payload
+        # Build Claude-specific payload (Anthropic API format)
         payload = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": body.get("max_tokens", 4096),
-            "temperature": body.get("temperature", 1.0),
+            "model": body.get("model"),
+            "max_tokens": body.get("max_tokens", 1024),
             "messages": anthropic_msgs,
         }
 
+        # Add optional parameters
+        if "temperature" in body:
+            payload["temperature"] = body["temperature"]
+        if stream:
+            payload["stream"] = True
+
         logger.debug(f"Claude payload: {json.dumps(payload, indent=2)}")
+
+        # Build Anthropic-specific headers
+        api_key = get_api_key_for_backend("claude", backend["config"])
+        claude_headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
+        }
+        logger.info(f"Claude headersq: {claude_headers}")
 
         # Generate response ID for OpenAI compatibility
         openai_resp_id = f"chatcmpl-{uuid.uuid4().hex[:29]}"
@@ -197,7 +227,7 @@ async def handle_claude_request(body, backend, stream):
                 response = await client.post(
                     backend["base_url"],
                     json=payload,
-                    headers=backend["headers"],
+                    headers=claude_headers,
                     timeout=120,
                 )
 
@@ -466,58 +496,77 @@ async def claude_stream_response(
         created_time = int(time.time())
         event_count = 0
 
-        logger.debug("Processing Claude stream events")
+        logger.debug("Processing Anthropic Claude stream events")
 
-        # Parse the response body as streaming JSON
-        response_body = await response.aread()
-        response_lines = response_body.decode().strip().split("\n")
-
-        for event_line in response_lines:
-            if not event_line.strip():
+        # Process the streaming response from Anthropic API
+        async for chunk in response.aiter_text():
+            if not chunk.strip():
                 continue
 
-            try:
-                event_count += 1
-                # Parse each line as JSON (Claude sends individual JSON objects per line)
-                chunk = json.loads(event_line)
-                logger.debug(f"Claude event {event_count}: type={chunk.get('type')}")
+            # Anthropic API sends Server-Sent Events format
+            lines = chunk.strip().split('\n')
+            for line in lines:
+                if line.startswith('data: '):
+                    data_part = line[6:]  # Remove 'data: ' prefix
 
-                if chunk["type"] == "content_block_delta":
-                    delta_text = chunk["delta"].get("text", "")
-                    if not delta_text:
-                        logger.debug(f"Claude event {event_count}: no delta text")
-                        continue
+                    if data_part == '[DONE]':
+                        logger.info(f"Claude streaming completed - processed {event_count} events")
+                        yield "data: [DONE]\n\n"
+                        return
 
-                    text_accum += delta_text
-                    stream_payload = {
-                        "id": openai_resp_id,
-                        "object": "chat.completion.chunk",
-                        "created": created_time,
-                        "model": model,
-                        "choices": [
-                            {
-                                "index": 0,
-                                "delta": {"content": delta_text},
-                                "finish_reason": None,
+                    try:
+                        event_count += 1
+                        event_data = json.loads(data_part)
+                        logger.debug(f"Claude event {event_count}: type={event_data.get('type')}")
+
+                        if event_data.get("type") == "content_block_delta":
+                            delta_text = event_data.get("delta", {}).get("text", "")
+                            if not delta_text:
+                                logger.debug(f"Claude event {event_count}: no delta text")
+                                continue
+
+                            text_accum += delta_text
+                            stream_payload = {
+                                "id": openai_resp_id,
+                                "object": "chat.completion.chunk",
+                                "created": created_time,
+                                "model": model,
+                                "choices": [
+                                    {
+                                        "index": 0,
+                                        "delta": {"content": delta_text},
+                                        "finish_reason": None,
+                                    }
+                                ],
                             }
-                        ],
-                    }
 
-                    logger.debug(f"Yielding Claude event {event_count}")
-                    yield f"data: {json.dumps(stream_payload, ensure_ascii=False)}\n\n"
+                            logger.debug(f"Yielding Claude event {event_count}")
+                            yield f"data: {json.dumps(stream_payload, ensure_ascii=False)}\n\n"
 
-                elif chunk["type"] == "message_stop":
-                    logger.info(
-                        f"Claude streaming completed - processed {event_count} events"
-                    )
-                    yield "data: [DONE]\n\n"
-                    return
+                        elif event_data.get("type") == "message_stop":
+                            # Send final chunk with finish_reason
+                            final_payload = {
+                                "id": openai_resp_id,
+                                "object": "chat.completion.chunk",
+                                "created": created_time,
+                                "model": model,
+                                "choices": [
+                                    {
+                                        "index": 0,
+                                        "delta": {},
+                                        "finish_reason": "stop",
+                                    }
+                                ],
+                            }
+                            yield f"data: {json.dumps(final_payload, ensure_ascii=False)}\n\n"
 
-            except json.JSONDecodeError as e:
-                logger.warning(
-                    f"Invalid JSON in Claude stream chunk: {event_line[:100]} - {e}"
-                )
-                continue
+                            logger.info(f"Claude streaming completed - processed {event_count} events")
+                            yield "data: [DONE]\n\n"
+                            return
+
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Invalid JSON in Claude stream chunk: {data_part[:100]} - {e}")
+                        continue
 
         logger.debug(f"Claude stream completed - processed {event_count} events")
         yield "data: [DONE]\n\n"
@@ -534,20 +583,20 @@ async def convert_claude_to_openai_response(resp_json, model, openai_resp_id):
     answer = ""
 
     try:
-        # Extract answer from Claude response structure
+        # Extract answer from Anthropic API response structure
         if (
             "content" in resp_json
             and isinstance(resp_json["content"], list)
             and resp_json["content"]
         ):
-            # Modern Claude API format with content blocks
+            # Anthropic API format with content blocks
             for block in resp_json["content"]:
                 if block.get("type") == "text":
                     answer += block.get("text", "")
             logger.debug(f"Extracted answer from content blocks: {len(answer)} chars")
 
         elif "completion" in resp_json:
-            # Legacy Claude API format
+            # Legacy format fallback
             answer = resp_json["completion"]
             logger.debug(f"Extracted answer from completion: {len(answer)} chars")
 
@@ -559,6 +608,10 @@ async def convert_claude_to_openai_response(resp_json, model, openai_resp_id):
         logger.error(f"Error extracting answer from Claude response: {e}")
         answer = ""
 
+    # Convert Anthropic stop_reason to OpenAI finish_reason
+    stop_reason = resp_json.get("stop_reason", "stop")
+    finish_reason = "stop" if stop_reason == "end_turn" else stop_reason
+
     # Build OpenAI-compatible response
     openai_resp = {
         "id": openai_resp_id,
@@ -569,7 +622,7 @@ async def convert_claude_to_openai_response(resp_json, model, openai_resp_id):
             {
                 "index": 0,
                 "message": {"role": "assistant", "content": answer},
-                "finish_reason": "stop",
+                "finish_reason": finish_reason,
             }
         ],
         "usage": resp_json.get("usage", {}),
