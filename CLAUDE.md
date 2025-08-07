@@ -88,6 +88,7 @@ flake8 src/ tests/
 - Advanced response formatting ensuring OpenAI API compliance
 - Robust timeout handling and network error management
 - Comprehensive logging for debugging and monitoring
+- **Claude Integration**: Full Claude API support with message format conversion and streaming
 
 **Database Initializer (`src/openwebui_service/pg_init.py`)**
 - PostgreSQL database setup utility using SQL templates
@@ -142,6 +143,14 @@ flake8 src/ tests/
 - Automatic API key management per provider
 - Response formatting ensures OpenAI API compliance regardless of backend
 - Logging integration for monitoring and debugging
+
+**Claude-Specific Processing**
+- **Message Format Conversion**: Automatically converts OpenAI messages to Anthropic format
+- **Role Filtering**: Filters out system messages and invalid roles for Claude compatibility
+- **Streaming Support**: Parses Claude streaming events (`content_block_delta`, `message_stop`) and converts to OpenAI SSE format
+- **Response Conversion**: Converts Claude response structure (content blocks/completion) to OpenAI format
+- **Error Handling**: Claude-specific error handling with proper HTTP status codes
+- **API Compatibility**: Full Anthropic API integration with bedrock-2023-05-31 version
 
 ## Important Notes
 

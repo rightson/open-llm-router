@@ -163,10 +163,10 @@ GEMINI_API_KEY=your_gemini_api_key_here
 The LLM Proxy provides a unified API to multiple AI providers with expandable model configurations:
 
 ### Supported Providers
-- **OpenAI**: GPT-4, GPT-3.5-turbo, GPT-4-turbo, GPT-4o
-- **Groq**: Llama 3.1 70B/8B, Mixtral 8x7B, Gemma 7B
-- **Claude**: Claude 3.5 Sonnet/Haiku, Claude 3 Opus/Sonnet/Haiku (via local proxy)
-- **Gemini**: Gemini Pro/Pro Vision, Gemini 1.5 Pro/Flash (via local proxy)
+- **OpenAI**: GPT-4o, GPT-4.1, O3 (direct integration)
+- **Groq**: Grok-4, Grok-3 (direct integration)
+- **Claude**: Claude Opus 4.1, Claude Sonnet 4 (with full OpenAI compatibility and streaming support)
+- **Gemini**: Gemini 2.5 Pro/Flash/Flash-Lite (via local proxy)
 
 ### Backend Configuration
 
@@ -179,43 +179,77 @@ The LLM Proxy provides a unified API to multiple AI providers with expandable mo
 **Customize backends in `conf/backends.json`:**
 ```json
 {
-  "backends": {
+  "providers": {
     "openai": {
       "name": "OpenAI",
-      "base_url": "https://api.openai.com/v1/chat/completions",
+      "base_url": "https://api.openai.com/v1",
       "api_key_env": "OPENAI_API_KEY",
-      "headers_template": {
-        "Authorization": "Bearer {api_key}"
+      "endpoints": {
+        "chat_completions": "/chat/completions"
       },
-      "models": ["gpt-4", "gpt-3.5-turbo", "gpt-4-turbo"],
-      "model_prefixes": ["gpt-"]
+      "models": ["gpt-4o", "gpt-4.1", "o3"],
+      "model_prefixes": ["gpt-", "o"]
+    },
+    "claude": {
+      "name": "Anthropic Claude",
+      "base_url": "http://localhost:9000/v1",
+      "api_key_env": "CLAUDE_API_KEY",
+      "endpoints": {
+        "chat_completions": "/chat/completions"
+      },
+      "models": ["claude-opus-4-1-20250805", "claude-sonnet-4-20250514"],
+      "model_prefixes": ["claude-"]
     },
     "custom_backend": {
       "name": "Custom LLM",
-      "base_url": "https://api.custom.com/v1/chat/completions",
+      "base_url": "https://api.custom.com/v1",
       "api_key_env": "CUSTOM_API_KEY",
-      "headers_template": {
-        "Authorization": "Bearer {api_key}",
-        "X-Custom-Header": "custom-value"
+      "endpoints": {
+        "chat_completions": "/chat/completions"
       },
       "models": ["custom-model-1", "custom-model-2"],
       "model_prefixes": ["custom-"]
     }
   },
   "model_aliases": {
-    "gpt": "gpt-3.5-turbo",
-    "fast": "gpt-3.5-turbo"
+    "gpt-4.1": "gpt-4.1",
+    "claude-sonnet-4": "claude-sonnet-4-20250514",
+    "claude-opus-4.1": "claude-opus-4-1-20250805"
   },
   "default_models": {
-    "chat": "gpt-3.5-turbo"
+    "chat": "gpt-4.1"
   }
 }
 ```
 
+### Claude Integration Features
+
+The LLM Proxy includes full Claude integration with OpenAI API compatibility:
+
+**Message Processing:**
+- Automatic conversion from OpenAI message format to Anthropic format
+- Filters out system messages and invalid roles for Claude compatibility
+- Preserves conversation context and message content
+
+**Streaming Support:**
+- Real-time streaming responses from Claude models
+- Converts Claude streaming events to OpenAI-compatible Server-Sent Events
+- Proper handling of `content_block_delta` and `message_stop` events
+
+**Response Compatibility:**
+- Converts Claude response structure to OpenAI format
+- Handles both modern content blocks and legacy completion formats
+- Maintains usage statistics and response metadata
+
+**Model Support:**
+- `claude-opus-4-1-20250805` (Claude Opus 4.1)
+- `claude-sonnet-4-20250514` (Claude Sonnet 4)
+- Model aliases: `claude-opus-4.1`, `claude-sonnet-4`
+
 ### API Endpoints
 - `GET /` - Health check
 - `GET /v1/models` - List all available models (OpenAI compatible)
-- `POST /v1/chat/completions` - Chat completions (OpenAI compatible)
+- `POST /v1/chat/completions` - Chat completions (OpenAI compatible, includes Claude)
 - `POST /admin/reload-backends` - Reload backend configuration
 - `GET /admin/config` - Get current configuration
 - `GET /admin/backends` - List all configured backends
@@ -234,13 +268,23 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 # List available models
 curl http://localhost:8000/v1/models
 
-# Use model alias
+# Use Claude model with streaming
 curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer your-api-key" \
+  -H "Authorization: Bearer your-claude-api-key" \
   -d '{
-    "model": "gpt",
-    "messages": [{"role": "user", "content": "Hello!"}]
+    "model": "claude-sonnet-4",
+    "messages": [{"role": "user", "content": "Explain quantum computing"}],
+    "stream": true
+  }'
+
+# Use Claude model alias
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-claude-api-key" \
+  -d '{
+    "model": "claude-opus-4.1",
+    "messages": [{"role": "user", "content": "Write a Python function"}]
   }'
 
 # Reload backends after editing conf/backends.json
@@ -349,6 +393,13 @@ pytest tests/test_llm_proxy.py --cov=llm_proxy --cov-report=html
    - Set Base URL to: `http://localhost:8000/v1`
    - Use any of your configured API keys
    - Select models: GPT-4, Llama, Claude, Gemini
+
+3. **Using Claude models:**
+   - Claude models appear as regular OpenAI-compatible models in Open-WebUI
+   - Available models: `claude-opus-4-1-20250805`, `claude-sonnet-4-20250514`
+   - Model aliases: `claude-opus-4.1`, `claude-sonnet-4`
+   - Full streaming support with real-time responses
+   - Automatic message format conversion (no configuration needed)
 
 ### Environment Customization
 You can override default settings in `.env`:
