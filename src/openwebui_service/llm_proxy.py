@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Header, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 import httpx
 import os
 import json
@@ -139,6 +139,121 @@ def get_api_key_for_backend(backend_name: str, backend_config: Dict[str, Any]) -
     return api_key
 
 
+def convert_openai_to_anthropic_messages(messages):
+    """Convert OpenAI messages format to Anthropic format"""
+    anthropic_msgs = []
+
+    for i, m in enumerate(messages):
+        logger.debug(
+            f"Processing message {i}: role={m.get('role')}, has_content={bool(m.get('content'))}"
+        )
+
+        # Skip messages without content
+        if not m.get("content"):
+            logger.debug(f"Skipping message {i} - no content")
+            continue
+
+        role = m["role"]
+
+        # Only allow user and assistant roles for Anthropic
+        if role not in ("user", "assistant"):
+            logger.debug(f"Skipping message {i} - invalid role: {role}")
+            continue
+
+        anthropic_msgs.append({"role": role, "content": m["content"]})
+
+    return anthropic_msgs
+
+
+async def handle_claude_request(body, backend, stream):
+    """Handle Claude-specific request processing"""
+    logger.info(f"Processing Claude model: {body.get('model')}")
+
+    try:
+        # Convert OpenAI messages to Anthropic format
+        messages = body.get("messages", [])
+        anthropic_msgs = convert_openai_to_anthropic_messages(messages)
+
+        logger.info(
+            f"Converted {len(messages)} messages to {len(anthropic_msgs)} Anthropic messages"
+        )
+
+        # Build Claude-specific payload
+        payload = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": body.get("max_tokens", 4096),
+            "temperature": body.get("temperature", 1.0),
+            "messages": anthropic_msgs,
+        }
+
+        logger.debug(f"Claude payload: {json.dumps(payload, indent=2)}")
+
+        # Generate response ID for OpenAI compatibility
+        openai_resp_id = f"chatcmpl-{uuid.uuid4().hex[:29]}"
+        logger.info(f"Generated response ID: {openai_resp_id}")
+
+        async with httpx.AsyncClient(timeout=120) as client:
+            try:
+                response = await client.post(
+                    backend["base_url"],
+                    json=payload,
+                    headers=backend["headers"],
+                    timeout=120,
+                )
+
+                if stream:
+                    logger.info("Starting Claude streaming response")
+                    return StreamingResponse(
+                        claude_stream_response(
+                            response, body.get("model"), openai_resp_id
+                        ),
+                        media_type="text/event-stream",
+                        headers={
+                            "Cache-Control": "no-cache",
+                            "Connection": "keep-alive",
+                            "Access-Control-Allow-Origin": "*",
+                            "Access-Control-Allow-Headers": "*",
+                        },
+                    )
+                else:
+                    logger.info("Creating Claude non-streaming response")
+                    if response.status_code != 200:
+                        error_detail = await get_error_detail(response)
+                        raise HTTPException(
+                            status_code=response.status_code, detail=error_detail
+                        )
+
+                    resp_json = response.json()
+                    logger.debug(
+                        f"Claude response JSON: {json.dumps(resp_json, indent=2)}"
+                    )
+
+                    # Convert Claude response to OpenAI format
+                    openai_resp = await convert_claude_to_openai_response(
+                        resp_json, body.get("model"), openai_resp_id
+                    )
+
+                    logger.info("Claude non-streaming response created successfully")
+                    return JSONResponse(content=openai_resp)
+
+            except httpx.TimeoutException:
+                logger.error(f"Timeout requesting Claude for model {body.get('model')}")
+                raise HTTPException(status_code=504, detail="Request timeout to Claude")
+            except httpx.RequestError as e:
+                logger.error(f"Request error to Claude: {str(e)}")
+                raise HTTPException(
+                    status_code=502, detail=f"Claude request failed: {str(e)}"
+                )
+
+    except Exception as e:
+        logger.error(f"Unexpected error in Claude processing: {str(e)}", exc_info=True)
+        error_response = {"error": f"Claude model processing failed: {str(e)}"}
+        return JSONResponse(
+            content=error_response,
+            status_code=500,
+        )
+
+
 def choose_backend(model: str):
     """Choose the appropriate backend for the given model"""
     backend_name = get_backend_for_model(model)
@@ -166,6 +281,7 @@ def choose_backend(model: str):
         "api_key": api_key,
         "headers": headers,
         "backend_name": backend_name,
+        "config": backend_config,
     }
 
 
@@ -189,7 +305,11 @@ async def proxy_chat_completions(request: Request, authorization: str = Header(N
         # Choose appropriate backend
         backend = choose_backend(model)
 
-        # Make request to backend
+        # Handle Claude-specific processing
+        if backend["backend_name"] == "claude":
+            return await handle_claude_request(body, backend, stream)
+
+        # Make request to backend (for non-Claude backends)
         async with httpx.AsyncClient(timeout=120) as client:
             try:
                 response = await client.post(
@@ -201,9 +321,30 @@ async def proxy_chat_completions(request: Request, authorization: str = Header(N
 
                 # Handle different response types
                 if stream:
-                    return StreamingResponse(
-                        stream_response(response), media_type="text/plain"
-                    )
+                    # Check if the backend response is actually streaming
+                    if response.headers.get("content-type", "").startswith(
+                        "text/event-stream"
+                    ):
+                        return StreamingResponse(
+                            stream_response(response),
+                            media_type="text/event-stream",
+                            headers={
+                                "Cache-Control": "no-cache",
+                                "Connection": "keep-alive",
+                                "Access-Control-Allow-Origin": "*",
+                                "Access-Control-Allow-Headers": "*",
+                            },
+                        )
+                    else:
+                        # Backend didn't return a stream, treat as non-streaming
+                        logger.warning(
+                            f"Expected streaming response but got {response.headers.get('content-type')}"
+                        )
+                        response_data = response.json()
+                        formatted_response = format_openai_response(
+                            response_data, model, backend["backend_name"]
+                        )
+                        return JSONResponse(content=formatted_response)
                 else:
                     # Handle non-streaming response
                     if response.status_code != 200:
@@ -219,7 +360,7 @@ async def proxy_chat_completions(request: Request, authorization: str = Header(N
                         response_data, model, backend["backend_name"]
                     )
 
-                    return formatted_response
+                    return JSONResponse(content=formatted_response)
 
             except httpx.TimeoutException:
                 logger.error(
@@ -316,11 +457,203 @@ def get_config():
     return BACKENDS_CONFIG
 
 
+async def claude_stream_response(
+    response: httpx.Response, model: str, openai_resp_id: str
+) -> AsyncGenerator[str, None]:
+    """Stream Claude response and convert to OpenAI format"""
+    try:
+        text_accum = ""
+        created_time = int(time.time())
+        event_count = 0
+
+        logger.debug("Processing Claude stream events")
+
+        # Parse the response body as streaming JSON
+        response_body = await response.aread()
+        response_lines = response_body.decode().strip().split("\n")
+
+        for event_line in response_lines:
+            if not event_line.strip():
+                continue
+
+            try:
+                event_count += 1
+                # Parse each line as JSON (Claude sends individual JSON objects per line)
+                chunk = json.loads(event_line)
+                logger.debug(f"Claude event {event_count}: type={chunk.get('type')}")
+
+                if chunk["type"] == "content_block_delta":
+                    delta_text = chunk["delta"].get("text", "")
+                    if not delta_text:
+                        logger.debug(f"Claude event {event_count}: no delta text")
+                        continue
+
+                    text_accum += delta_text
+                    stream_payload = {
+                        "id": openai_resp_id,
+                        "object": "chat.completion.chunk",
+                        "created": created_time,
+                        "model": model,
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {"content": delta_text},
+                                "finish_reason": None,
+                            }
+                        ],
+                    }
+
+                    logger.debug(f"Yielding Claude event {event_count}")
+                    yield f"data: {json.dumps(stream_payload, ensure_ascii=False)}\n\n"
+
+                elif chunk["type"] == "message_stop":
+                    logger.info(
+                        f"Claude streaming completed - processed {event_count} events"
+                    )
+                    yield "data: [DONE]\n\n"
+                    return
+
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    f"Invalid JSON in Claude stream chunk: {event_line[:100]} - {e}"
+                )
+                continue
+
+        logger.debug(f"Claude stream completed - processed {event_count} events")
+        yield "data: [DONE]\n\n"
+
+    except Exception as e:
+        logger.error(f"Exception in Claude event generator: {str(e)}", exc_info=True)
+        error_payload = {"error": f"Claude stream processing failed: {str(e)}"}
+        yield f"data: {json.dumps(error_payload, ensure_ascii=False)}\n\n"
+        yield "data: [DONE]\n\n"
+
+
+async def convert_claude_to_openai_response(resp_json, model, openai_resp_id):
+    """Convert Claude non-streaming response to OpenAI format"""
+    answer = ""
+
+    try:
+        # Extract answer from Claude response structure
+        if (
+            "content" in resp_json
+            and isinstance(resp_json["content"], list)
+            and resp_json["content"]
+        ):
+            # Modern Claude API format with content blocks
+            for block in resp_json["content"]:
+                if block.get("type") == "text":
+                    answer += block.get("text", "")
+            logger.debug(f"Extracted answer from content blocks: {len(answer)} chars")
+
+        elif "completion" in resp_json:
+            # Legacy Claude API format
+            answer = resp_json["completion"]
+            logger.debug(f"Extracted answer from completion: {len(answer)} chars")
+
+        else:
+            logger.error("Error extracting answer from Claude response")
+            answer = ""
+
+    except Exception as e:
+        logger.error(f"Error extracting answer from Claude response: {e}")
+        answer = ""
+
+    # Build OpenAI-compatible response
+    openai_resp = {
+        "id": openai_resp_id,
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": model,
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": answer},
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": resp_json.get("usage", {}),
+    }
+
+    logger.info("Claude non-streaming response created successfully")
+    return openai_resp
+
+
 async def stream_response(response: httpx.Response) -> AsyncGenerator[str, None]:
     """Stream response from backend while maintaining OpenAI format"""
-    async for chunk in response.aiter_text():
-        if chunk.strip():
-            yield chunk
+    try:
+        chunk_count = 0
+        async for chunk in response.aiter_text():
+            if chunk:
+                chunk_count += 1
+                logger.debug(f"Processing chunk {chunk_count}")
+
+                # Parse the SSE chunk
+                lines = chunk.strip().split("\n")
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith("data: "):
+                        data_part = line[6:]  # Remove 'data: ' prefix
+
+                        if data_part == "[DONE]":
+                            logger.debug("Stream completed - sending [DONE]")
+                            yield "data: [DONE]\n\n"
+                            return
+
+                        try:
+                            # Parse and re-serialize to ensure valid JSON
+                            chunk_dict = json.loads(data_part)
+
+                            # Create OpenAI-compatible streaming chunk
+                            if "choices" in chunk_dict:
+                                # Already in correct format
+                                payload = chunk_dict
+                            else:
+                                # Convert to OpenAI streaming format
+                                payload = {
+                                    "id": chunk_dict.get(
+                                        "id", f"chatcmpl-{uuid.uuid4().hex[:29]}"
+                                    ),
+                                    "object": "chat.completion.chunk",
+                                    "created": chunk_dict.get(
+                                        "created", int(time.time())
+                                    ),
+                                    "model": chunk_dict.get("model", "unknown"),
+                                    "choices": [
+                                        {
+                                            "index": 0,
+                                            "delta": chunk_dict.get("delta", {}),
+                                            "finish_reason": chunk_dict.get(
+                                                "finish_reason"
+                                            ),
+                                        }
+                                    ],
+                                }
+
+                            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+                        except json.JSONDecodeError as e:
+                            logger.warning(
+                                f"Invalid JSON in stream chunk: {data_part[:100]} - {e}"
+                            )
+                            continue
+                    elif line and not line.startswith("data:"):
+                        logger.debug(f"Non-data line in stream: {line}")
+
+        logger.debug(f"Stream completed - processed {chunk_count} chunks")
+        yield "data: [DONE]\n\n"
+
+    except Exception as e:
+        logger.error(f"Exception in stream_response: {str(e)}")
+        # Send error in SSE format
+        error_payload = {
+            "error": {
+                "message": f"Stream processing error: {str(e)}",
+                "type": "stream_error",
+            }
+        }
+        yield f"data: {json.dumps(error_payload, ensure_ascii=False)}\n\n"
+        yield "data: [DONE]\n\n"
 
 
 async def get_error_detail(response: httpx.Response) -> str:
