@@ -14,6 +14,12 @@ class OpenAIProvider(BaseProvider):
         proxy_logger.info(f"Processing {self.backend_name} model: {model}")
         start_time = time.time()
 
+        # Ensure the request body has the correct stream parameter
+        request_body = body.copy()
+        request_body["stream"] = stream
+
+        proxy_logger.debug(f"OpenAI request body stream parameter set to: {stream}")
+
         # Log the upstream request
         url = self.backend["base_url"]
         proxy_logger.log_request(self.backend_name, model, url, stream)
@@ -23,7 +29,7 @@ class OpenAIProvider(BaseProvider):
             try:
                 response = await client.post(
                     url,
-                    json=body,
+                    json=request_body,
                     headers=self.backend["headers"],
                     timeout=120,
                 )
@@ -35,10 +41,14 @@ class OpenAIProvider(BaseProvider):
 
                 # Handle different response types
                 if stream:
+                    response_content_type = response.headers.get("content-type", "")
+                    proxy_logger.debug(
+                        f"Stream requested, backend returned content-type: {response_content_type}"
+                    )
+
                     # Check if the backend response is actually streaming
-                    if response.headers.get("content-type", "").startswith(
-                        "text/event-stream"
-                    ):
+                    if response_content_type.startswith("text/event-stream"):
+                        proxy_logger.info(f"Starting streaming response for {model}")
                         return StreamingResponse(
                             self.stream_response(response),
                             media_type="text/event-stream",
@@ -52,7 +62,8 @@ class OpenAIProvider(BaseProvider):
                     else:
                         # Backend didn't return a stream, treat as non-streaming
                         proxy_logger.warning(
-                            f"Expected streaming response but got {response.headers.get('content-type')}"
+                            f"Expected streaming response but got content-type: {response_content_type}. "
+                            f"Status: {response.status_code}. Falling back to non-streaming."
                         )
                         response_data = response.json()
                         formatted_response = self.format_openai_response(
