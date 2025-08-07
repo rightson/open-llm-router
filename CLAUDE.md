@@ -80,10 +80,14 @@ flake8 src/ tests/
 
 **LLM Proxy (`src/openwebui_service/llm_proxy.py`)**
 - FastAPI application providing unified API to multiple AI providers
-- Supports OpenAI, Groq, Claude, and Gemini models
+- Supports OpenAI, Groq, Claude, and Gemini models with full OpenAI compatibility
+- Complete `proxy_chat_completions` implementation with comprehensive error handling
 - Routes requests based on model names and prefixes
 - Configurable backends via `conf/backends.json`
-- OpenAI-compatible API endpoints
+- OpenAI-compatible API endpoints with streaming support
+- Advanced response formatting ensuring OpenAI API compliance
+- Robust timeout handling and network error management
+- Comprehensive logging for debugging and monitoring
 
 **Database Initializer (`src/openwebui_service/pg_init.py`)**
 - PostgreSQL database setup utility using SQL templates
@@ -112,10 +116,11 @@ flake8 src/ tests/
 ### Key Patterns
 
 **Model Routing Logic**
-- Model aliases resolve first (e.g., "gpt" → "gpt-3.5-turbo")
+- Model aliases resolve first (e.g., "gpt-4.1" → "gpt-4.1", "claude-opus-4.1" → "claude-opus-4-1-20250805")
 - Exact model name matching against backend configurations
 - Fallback to prefix-based matching for backward compatibility
-- Error handling for unknown models
+- Error handling for unknown models with proper HTTP status codes
+- Support for 10+ models across 4 providers (OpenAI, Groq, Claude, Gemini)
 
 **Template System**
 - SQL templates with variable substitution
@@ -128,10 +133,44 @@ flake8 src/ tests/
 - PostgreSQL database for data persistence
 - PM2 for production process management
 
+**proxy_chat_completions Implementation**
+- Full OpenAI-compatible `/v1/chat/completions` endpoint
+- Supports both streaming and non-streaming responses
+- Advanced response format normalization from various backend formats
+- Comprehensive error handling: timeouts (120s), network errors, malformed requests
+- Request validation with meaningful error messages
+- Automatic API key management per provider
+- Response formatting ensures OpenAI API compliance regardless of backend
+- Logging integration for monitoring and debugging
+
 ## Important Notes
 
 - The LLM proxy expects backend configurations in `conf/backends.json` (falls back to `conf/backends.example.json`)
+- Configuration supports both legacy format and new provider-based format with automatic conversion
 - All services require proper environment configuration via `.env` file
 - Testing includes both unit tests and integration tests requiring real API keys
 - The system supports multiple PostgreSQL installations (Homebrew, system, Postgres.app)
 - PM2 is required for production service management
+
+## Supported Models
+
+The proxy currently supports the following models across 4 providers:
+
+**OpenAI Models:**
+- `gpt-4o`, `gpt-4.1`, `o3`
+
+**Groq Models:**
+- `grok-4`, `grok-3`
+
+**Claude Models:**
+- `claude-opus-4-1-20250805`, `claude-sonnet-4-20250514`
+
+**Gemini Models:**
+- `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`
+
+**Model Aliases (preserve major/minor versions, remove datecodes):**
+- `gpt-4.1` → `gpt-4.1`
+- `grok-4` → `grok-4` 
+- `claude-sonnet-4` → `claude-sonnet-4-20250514`
+- `claude-opus-4.1` → `claude-opus-4-1-20250805`
+- `gemini-2.5` → `gemini-2.5-pro`

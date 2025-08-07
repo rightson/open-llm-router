@@ -19,7 +19,7 @@ class PostgresInitializer:
         self.required_vars = [
             "OPENWEBUI_DB_USER",
             "OPENWEBUI_DB_PASSWORD",
-            "OPENWEBUI_DB_NAME"
+            "OPENWEBUI_DB_NAME",
         ]
 
     def load_environment(self):
@@ -42,7 +42,10 @@ class PostgresInitializer:
                 env_vars[var] = value
 
         if missing_vars:
-            print(f"Error: Missing required environment variables: {', '.join(missing_vars)}", file=sys.stderr)
+            print(
+                f"Error: Missing required environment variables: {', '.join(missing_vars)}",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
         return env_vars
@@ -50,20 +53,22 @@ class PostgresInitializer:
     def load_template(self):
         """Load SQL template file"""
         if not Path(self.template_file).exists():
-            print(f"Error: Template file {self.template_file} not found", file=sys.stderr)
+            print(
+                f"Error: Template file {self.template_file} not found", file=sys.stderr
+            )
             sys.exit(1)
 
-        with open(self.template_file, 'r', encoding='utf-8') as f:
+        with open(self.template_file, "r", encoding="utf-8") as f:
             return f.read()
 
     def generate_sql(self, template_content, env_vars):
         """Generate SQL by substituting template variables"""
         try:
             # First escape dollar quotes, then substitute, then restore dollar quotes
-            template_content = template_content.replace('\\$\\$', '__DOLLAR_QUOTE__')
+            template_content = template_content.replace("\\$\\$", "__DOLLAR_QUOTE__")
             template = Template(template_content)
             sql_content = template.substitute(env_vars)
-            sql_content = sql_content.replace('__DOLLAR_QUOTE__', '$$')
+            sql_content = sql_content.replace("__DOLLAR_QUOTE__", "$$")
             return sql_content
         except KeyError as e:
             print(f"Error: Missing template variable {e}", file=sys.stderr)
@@ -73,7 +78,7 @@ class PostgresInitializer:
         """Write generated SQL to output file"""
         # Ensure parent directory exists
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             f.write(sql_content)
 
     def run(self, output_file="run/init_openwebui_db.sql", dry_run=False):
@@ -103,7 +108,9 @@ class PostgresInitializer:
         print("To execute:")
         print(f"  psql -U postgres -f {output_file}")
         print("Or with connection string:")
-        print(f"  psql 'postgresql://postgres@localhost:5432/postgres' -f {output_file}")
+        print(
+            f"  psql 'postgresql://postgres@localhost:5432/postgres' -f {output_file}"
+        )
 
 
 def create_template_file():
@@ -151,7 +158,7 @@ ALTER DATABASE $OPENWEBUI_DB_NAME OWNER TO $OPENWEBUI_DB_USER;
 """
 
     Path("templates").mkdir(exist_ok=True)
-    with open("templates/init_template.sql", 'w', encoding='utf-8') as f:
+    with open("templates/init_template.sql", "w", encoding="utf-8") as f:
         f.write(template_content)
 
     print("✓ Created templates/init_template.sql")
@@ -169,7 +176,7 @@ OPENWEBUI_DB_NAME=openwebui_db
 # DB_PORT=5432
 """
 
-    with open(".env.example", 'w', encoding='utf-8') as f:
+    with open(".env.example", "w", encoding="utf-8") as f:
         f.write(env_content)
 
     print("✓ Created .env.example")
@@ -180,29 +187,27 @@ def main():
         description="Initialize PostgreSQL database for Open-WebUI"
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         default="run/init_openwebui_db.sql",
-        help="Output SQL file (default: run/init_openwebui_db.sql)"
+        help="Output SQL file (default: run/init_openwebui_db.sql)",
     )
     parser.add_argument(
-        "-t", "--template",
+        "-t",
+        "--template",
         default="templates/init_template.sql",
-        help="SQL template file (default: templates/init_template.sql)"
+        help="SQL template file (default: templates/init_template.sql)",
     )
     parser.add_argument(
-        "-e", "--env-file",
-        default=".env",
-        help="Environment file (default: .env)"
+        "-e", "--env-file", default=".env", help="Environment file (default: .env)"
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print generated SQL instead of writing to file"
+        help="Print generated SQL instead of writing to file",
     )
     parser.add_argument(
-        "--init-files",
-        action="store_true",
-        help="Create template and example files"
+        "--init-files", action="store_true", help="Create template and example files"
     )
 
     args = parser.parse_args()
