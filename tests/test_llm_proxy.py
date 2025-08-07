@@ -11,8 +11,10 @@ from fastapi.testclient import TestClient
 
 # Import the FastAPI app
 import sys
-sys.path.insert(0, '..')
-from src.openwebui_service.llm_proxy import app
+
+sys.path.insert(0, "..")
+from src.openwebui_service.llm_proxy import app  # noqa: E402
+
 
 class TestLLMProxy:
     """Test suite for LLM Proxy functionality"""
@@ -22,10 +24,10 @@ class TestLLMProxy:
         self.client = TestClient(app)
 
         # Load backends configuration
-        with open('../conf/backends.json', 'r') as f:
+        with open("../conf/backends.json", "r") as f:
             self.config = json.load(f)
 
-        self.backends = self.config['backends']
+        self.backends = self.config["backends"]
 
     def test_health_endpoint(self):
         """Test the health check endpoint"""
@@ -51,63 +53,50 @@ class TestLLMProxy:
     def test_openai_model_routing(self):
         """Test OpenAI model routing logic"""
         # Test GPT models
-        test_cases = [
-            "gpt-4",
-            "gpt-3.5-turbo",
-            "gpt-4-turbo"
-        ]
+        test_cases = ["gpt-4", "gpt-3.5-turbo", "gpt-4-turbo"]
 
         for model in test_cases:
             # Import the routing function
             from src.openwebui_service.llm_proxy import choose_backend
 
             # Mock environment variable
-            with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
+            with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
                 backend = choose_backend(model)
                 assert "api.openai.com" in backend["base_url"]
                 assert backend["api_key"] == "test-key"
 
     def test_grok_model_routing(self):
         """Test Groq model routing logic"""
-        test_cases = [
-            "llama-3.1-70b-versatile",
-            "mixtral-8x7b-32768"
-        ]
+        test_cases = ["llama-3.1-70b-versatile", "mixtral-8x7b-32768"]
 
         for model in test_cases:
             from src.openwebui_service.llm_proxy import choose_backend
 
-            with patch.dict(os.environ, {'GROK_API_KEY': 'test-grok-key'}):
+            with patch.dict(os.environ, {"GROK_API_KEY": "test-grok-key"}):
                 backend = choose_backend(model)
                 assert "api.grok.com" in backend["base_url"]
                 assert backend["api_key"] == "test-grok-key"
 
     def test_claude_model_routing(self):
         """Test Claude model routing logic"""
-        test_cases = [
-            "claude-3-5-sonnet",
-            "claude-3-haiku"
-        ]
+        test_cases = ["claude-3-5-sonnet", "claude-3-haiku"]
 
         for model in test_cases:
             from src.openwebui_service.llm_proxy import choose_backend
 
-            with patch.dict(os.environ, {'CLAUDE_API_KEY': 'test-claude-key'}):
+            with patch.dict(os.environ, {"CLAUDE_API_KEY": "test-claude-key"}):
                 backend = choose_backend(model)
                 assert "localhost:9000" in backend["base_url"]
                 assert backend["api_key"] == "test-claude-key"
 
     def test_gemini_model_routing(self):
         """Test Gemini model routing logic"""
-        test_cases = [
-            "gemini-pro",
-            "gemini-pro-vision"
-        ]
+        test_cases = ["gemini-pro", "gemini-pro-vision"]
 
         for model in test_cases:
             from src.openwebui_service.llm_proxy import choose_backend
 
-            with patch.dict(os.environ, {'GEMINI_API_KEY': 'test-gemini-key'}):
+            with patch.dict(os.environ, {"GEMINI_API_KEY": "test-gemini-key"}):
                 backend = choose_backend(model)
                 assert "localhost:9001" in backend["base_url"]
                 assert backend["api_key"] == "test-gemini-key"
@@ -123,7 +112,7 @@ class TestLLMProxy:
         assert exc_info.value.status_code == 400
         assert "Unknown model" in str(exc_info.value.detail)
 
-    @patch('httpx.AsyncClient.post')
+    @patch("httpx.AsyncClient.post")
     async def test_chat_completions_endpoint_success(self, mock_post):
         """Test successful chat completions request"""
         # Mock successful response
@@ -132,19 +121,19 @@ class TestLLMProxy:
             "id": "test-completion",
             "object": "chat.completion",
             "model": "gpt-3.5-turbo",
-            "choices": [{"message": {"content": "Test response"}}]
+            "choices": [{"message": {"content": "Test response"}}],
         }
         mock_post.return_value = mock_response
 
         # Test request
-        with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
             response = self.client.post(
                 "/v1/chat/completions",
                 json={
                     "model": "gpt-3.5-turbo",
-                    "messages": [{"role": "user", "content": "Hello"}]
+                    "messages": [{"role": "user", "content": "Hello"}],
                 },
-                headers={"Authorization": "Bearer test-key"}
+                headers={"Authorization": "Bearer test-key"},
             )
 
         assert response.status_code == 200
@@ -154,12 +143,17 @@ class TestLLMProxy:
         """Test handling of missing API keys"""
         with patch.dict(os.environ, {}, clear=True):
             # Test that app still starts but with default values
-            from src.openwebui_service.llm_proxy import OPENAI_API_KEY, GROK_API_KEY, CLAUDE_API_KEY, GEMINI_API_KEY
+            from src.openwebui_service.llm_proxy import (
+                OPENAI_API_KEY,
+                GROK_API_KEY,
+                CLAUDE_API_KEY,
+                GEMINI_API_KEY,
+            )
 
             assert OPENAI_API_KEY == "sk-xxxx"  # Default value
-            assert GROK_API_KEY == "gsk-xxxx"   # Default value
+            assert GROK_API_KEY == "gsk-xxxx"  # Default value
             assert CLAUDE_API_KEY == "sk-ant-xxx"  # Default value
-            assert GEMINI_API_KEY == "AIza..."   # Default value
+            assert GEMINI_API_KEY == "AIza..."  # Default value
 
     @pytest.mark.parametrize("backend_name", ["openai", "grok", "claude", "gemini"])
     def test_backend_endpoints_format(self, backend_name):
@@ -196,10 +190,12 @@ class TestLLMProxy:
         backends = BACKENDS_CONFIG.get("backends", {})
         for backend_name, backend_config in backends.items():
             models = backend_config.get("models", [])
-            api_key_env = backend_config.get("api_key_env", f"{backend_name.upper()}_API_KEY")
+            api_key_env = backend_config.get(
+                "api_key_env", f"{backend_name.upper()}_API_KEY"
+            )
 
             # Set up mock environment
-            with patch.dict(os.environ, {api_key_env: 'test-key'}):
+            with patch.dict(os.environ, {api_key_env: "test-key"}):
                 for model in models:
                     try:
                         backend = choose_backend(model)
@@ -210,11 +206,16 @@ class TestLLMProxy:
                         assert "backend_name" in backend
                         assert backend["backend_name"] == backend_name
                     except Exception as e:
-                        pytest.fail(f"Model {model} from {backend_name} failed routing: {e}")
+                        pytest.fail(
+                            f"Model {model} from {backend_name} failed routing: {e}"
+                        )
 
     def test_model_aliases(self):
         """Test that model aliases work correctly"""
-        from src.openwebui_service.llm_proxy import get_backend_for_model, BACKENDS_CONFIG
+        from src.openwebui_service.llm_proxy import (
+            get_backend_for_model,
+            BACKENDS_CONFIG,
+        )
 
         model_aliases = BACKENDS_CONFIG.get("model_aliases", {})
         for alias, target_model in model_aliases.items():
@@ -232,13 +233,15 @@ class TestLLMProxy:
 
         backends = BACKENDS_CONFIG.get("backends", {})
         for backend_name, backend_config in backends.items():
-            api_key_env = backend_config.get("api_key_env", f"{backend_name.upper()}_API_KEY")
+            api_key_env = backend_config.get(
+                "api_key_env", f"{backend_name.upper()}_API_KEY"
+            )
             models = backend_config.get("models", [])
 
             if not models:
                 continue
 
-            with patch.dict(os.environ, {api_key_env: 'test-api-key'}):
+            with patch.dict(os.environ, {api_key_env: "test-api-key"}):
                 try:
                     backend = choose_backend(models[0])  # Test with first model
                     headers = backend.get("headers", {})
@@ -249,7 +252,9 @@ class TestLLMProxy:
                     assert "test-api-key" in auth_header
                     assert "{api_key}" not in auth_header  # Should be formatted
                 except Exception as e:
-                    pytest.fail(f"Backend {backend_name} headers formatting failed: {e}")
+                    pytest.fail(
+                        f"Backend {backend_name} headers formatting failed: {e}"
+                    )
 
     def test_models_endpoint(self):
         """Test the /v1/models endpoint"""
@@ -281,7 +286,9 @@ class TestLLMProxyIntegration:
         self.client = TestClient(app)
 
     @pytest.mark.integration
-    @pytest.mark.skipif(not os.getenv('OPENAI_API_KEY'), reason="OpenAI API key not available")
+    @pytest.mark.skipif(
+        not os.getenv("OPENAI_API_KEY"), reason="OpenAI API key not available"
+    )
     def test_real_openai_api_call(self):
         """Test real API call to OpenAI (requires API key)"""
         response = self.client.post(
@@ -289,16 +296,22 @@ class TestLLMProxyIntegration:
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": "Say hello"}],
-                "max_tokens": 10
+                "max_tokens": 10,
             },
-            headers={"Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}"}
+            headers={"Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}"},
         )
 
         # Should get a response (might be rate limited, but should be valid)
-        assert response.status_code in [200, 429, 401]  # Success, rate limit, or auth error
+        assert response.status_code in [
+            200,
+            429,
+            401,
+        ]  # Success, rate limit, or auth error
 
     @pytest.mark.integration
-    @pytest.mark.skipif(not os.getenv('GROK_API_KEY'), reason="Groq API key not available")
+    @pytest.mark.skipif(
+        not os.getenv("GROK_API_KEY"), reason="Groq API key not available"
+    )
     def test_real_grok_api_call(self):
         """Test real API call to Groq (requires API key)"""
         response = self.client.post(
@@ -306,9 +319,9 @@ class TestLLMProxyIntegration:
             json={
                 "model": "llama-3.1-70b-versatile",
                 "messages": [{"role": "user", "content": "Say hello"}],
-                "max_tokens": 10
+                "max_tokens": 10,
             },
-            headers={"Authorization": f"Bearer {os.getenv('GROK_API_KEY')}"}
+            headers={"Authorization": f"Bearer {os.getenv('GROK_API_KEY')}"},
         )
 
         assert response.status_code in [200, 429, 401]
