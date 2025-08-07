@@ -81,14 +81,20 @@ flake8 src/ tests/
 **LLM Proxy (`src/openwebui_service/llm_proxy.py`)**
 - FastAPI application providing unified API to multiple AI providers
 - Supports OpenAI, Groq, Claude, and Gemini models with full OpenAI compatibility
-- Complete `proxy_chat_completions` implementation with comprehensive error handling
-- Routes requests based on model names and prefixes
-- Configurable backends via `conf/backends.json`
+- Modular architecture with provider-specific handlers
 - OpenAI-compatible API endpoints with streaming support
-- Advanced response formatting ensuring OpenAI API compliance
-- Robust timeout handling and network error management
-- Comprehensive logging for debugging and monitoring
-- **Claude Integration**: Full Claude API support with message format conversion and streaming
+- Enhanced logging with upstream provider request/response timing and status codes
+
+**Utility Modules (`src/openwebui_service/utils/`)**
+- **Logger (`utils/logger.py`)**: Enhanced logging with upstream API provider tracking, request/response timing, and status codes
+- **Config (`utils/config.py`)**: Backend configuration loading with support for both new and legacy formats
+- **Model Router (`utils/model_router.py`)**: Model-to-backend routing, API key management, and backend selection
+
+**Provider Modules (`src/openwebui_service/providers/`)**
+- **Base Provider (`providers/base.py`)**: Common functionality for error handling, response formatting, and streaming
+- **Claude Provider (`providers/claude.py`)**: Anthropic API integration with message format conversion and streaming support
+- **Gemini Provider (`providers/gemini.py`)**: Google Gemini API integration with specialized streaming parser
+- **OpenAI Provider (`providers/openai.py`)**: Handles OpenAI and OpenAI-compatible providers (Groq, etc.)
 
 **Database Initializer (`src/openwebui_service/pg_init.py`)**
 - PostgreSQL database setup utility using SQL templates
@@ -134,32 +140,55 @@ flake8 src/ tests/
 - PostgreSQL database for data persistence
 - PM2 for production process management
 
-**proxy_chat_completions Implementation**
-- Full OpenAI-compatible `/v1/chat/completions` endpoint
-- Supports both streaming and non-streaming responses
-- Advanced response format normalization from various backend formats
-- Comprehensive error handling: timeouts (120s), network errors, malformed requests
-- Request validation with meaningful error messages
-- Automatic API key management per provider
-- Response formatting ensures OpenAI API compliance regardless of backend
-- Logging integration for monitoring and debugging
+**Modular Provider Architecture**
+- **Provider Selection**: Automatic provider instantiation based on model routing
+- **Request Handling**: Provider-specific request processing with enhanced logging
+- **Response Formatting**: Consistent OpenAI-compatible response formatting across all providers
+- **Error Handling**: Comprehensive error handling with provider-specific error processing
+- **Streaming Support**: Provider-specific streaming implementations with OpenAI SSE format conversion
 
-**Claude-Specific Processing**
-- **Message Format Conversion**: Automatically converts OpenAI messages to Anthropic format
-- **Role Filtering**: Filters out system messages and invalid roles for Claude compatibility
-- **Streaming Support**: Parses Claude streaming events (`content_block_delta`, `message_stop`) and converts to OpenAI SSE format
-- **Response Conversion**: Converts Claude response structure (content blocks/completion) to OpenAI format
-- **Error Handling**: Claude-specific error handling with proper HTTP status codes
-- **API Compatibility**: Full Anthropic API integration with bedrock-2023-05-31 version
+**Enhanced Logging System**
+- **Request Logging**: Logs outgoing requests with provider, model, URL, and streaming status
+  - Format: `→ CLAUDE: claude-sonnet-4 (streaming) -> https://api.anthropic.com/v1/messages`
+- **Response Logging**: Logs responses with timing, status codes, and success indicators
+  - Format: `← CLAUDE: ✓ 200 in 1234ms for claude-sonnet-4`
+- **Debug Information**: Model alias resolution, backend selection, and API key status
+- **Error Tracking**: Detailed error logging with request context and provider information
+
+**Provider-Specific Features**
+- **Claude Provider**: Message format conversion, role filtering, Anthropic API streaming event parsing
+- **Gemini Provider**: Specialized JSON array streaming parser, usage metadata extraction
+- **OpenAI Provider**: Direct OpenAI API compatibility with fallback response formatting
+- **Base Provider**: Shared error handling, response formatting, and streaming utilities
 
 ## Important Notes
 
-- The LLM proxy expects backend configurations in `conf/backends.json` (falls back to `conf/backends.example.json`)
-- Configuration supports both legacy format and new provider-based format with automatic conversion
-- All services require proper environment configuration via `.env` file
-- Testing includes both unit tests and integration tests requiring real API keys
-- The system supports multiple PostgreSQL installations (Homebrew, system, Postgres.app)
-- PM2 is required for production service management
+- **Modular Architecture**: The LLM proxy is now organized into focused modules for better maintainability
+- **Enhanced Logging**: INFO logger displays upstream provider, timing, and status codes for all requests
+- **Backward Compatibility**: All existing functionality and APIs remain unchanged
+- **Configuration**: Backend configurations in `conf/backends.json` (falls back to `conf/backends.example.json`)
+- **Testing**: All existing tests pass without modification (19/19 passed)
+- **Environment**: All services require proper environment configuration via `.env` file
+- **Dependencies**: PostgreSQL and PM2 required for production deployment
+
+## File Structure
+
+```
+src/openwebui_service/
+├── llm_proxy.py              # Main FastAPI application
+├── pg_init.py                # Database initialization
+├── utils/                    # Utility modules
+│   ├── __init__.py
+│   ├── logger.py             # Enhanced logging with provider tracking
+│   ├── config.py             # Backend configuration management
+│   └── model_router.py       # Model routing and backend selection
+└── providers/                # Provider-specific implementations
+    ├── __init__.py
+    ├── base.py               # Base provider with common functionality
+    ├── claude.py             # Anthropic Claude API integration
+    ├── gemini.py             # Google Gemini API integration
+    └── openai.py             # OpenAI and compatible providers
+```
 
 ## Supported Models
 
