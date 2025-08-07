@@ -9,7 +9,7 @@ app = FastAPI()
 
 # API KEY configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "sk-xxxx")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "gsk-xxxx")
+GROK_API_KEY = os.getenv("GROK_API_KEY", "gsk-xxxx")
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", "sk-ant-xxx")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIza...")
 
@@ -37,10 +37,10 @@ def load_backends() -> Dict[str, Any]:
                     "models": ["gpt-4", "gpt-3.5-turbo"],
                     "model_prefixes": ["gpt-"]
                 },
-                "groq": {
+                "grok": {
                     "name": "Groq",
-                    "base_url": "https://api.groq.com/openai/v1/chat/completions",
-                    "api_key_env": "GROQ_API_KEY",
+                    "base_url": "https://api.grok.com/openai/v1/chat/completions",
+                    "api_key_env": "GROK_API_KEY",
                     "headers_template": {"Authorization": "Bearer {api_key}"},
                     "models": ["llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
                     "model_prefixes": ["llama", "mixtral"]
@@ -87,7 +87,7 @@ def get_api_key_for_backend(backend_name: str, backend_config: Dict[str, Any]) -
         # Fallback to legacy environment variables
         legacy_keys = {
             "OPENAI_API_KEY": OPENAI_API_KEY,
-            "GROQ_API_KEY": GROQ_API_KEY,
+            "GROK_API_KEY": GROK_API_KEY,
             "CLAUDE_API_KEY": CLAUDE_API_KEY,
             "GEMINI_API_KEY": GEMINI_API_KEY
         }
@@ -128,9 +128,8 @@ async def proxy_chat_completions(request: Request,
     body = await request.json()
     model = body.get("model", "gpt-3.5-turbo")
 
-    # Simple auth, can be expanded to JWT, OAuth, or other methods.
-    if authorization not in [f"Bearer {OPENAI_API_KEY}", f"Bearer {GROQ_API_KEY}"]:
-        pass # Add your own authentication logic.
+    if authorization not in [f"Bearer {OPENAI_API_KEY}", f"Bearer {GROK_API_KEY}"]:
+        pass
 
     backend = choose_backend(model)
 

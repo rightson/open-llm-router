@@ -126,7 +126,7 @@ DATABASE_URL=postgresql://${OPENWEBUI_DB_USER}:${OPENWEBUI_DB_PASSWORD}@${DB_HOS
 
 # LLM API Configuration
 OPENAI_API_KEY=your_openai_api_key_here
-GROQ_API_KEY=your_groq_api_key_here
+GROK_API_KEY=your_grok_api_key_here
 CLAUDE_API_KEY=your_claude_api_key_here
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
@@ -144,8 +144,8 @@ GEMINI_API_KEY=your_gemini_api_key_here
 │       └── pg_init.py             # Database initialization utility
 ├── conf/                          # Configuration files
 │   ├── backends.example.json     # Default backend configurations (for git)
-│   ├── models.example.json       # Legacy model configurations (for git) 
-│   ├── providers.json            # LLM providers configuration
+│   ├── models.example.json       # Legacy model configurations (for git)
+│   ├── backends.json            # LLM providers configuration
 │   ├── backends.json             # Custom backend configurations (git ignored)
 │   └── models.json               # Legacy model configurations (git ignored)
 ├── templates/                     # Template files
@@ -164,7 +164,7 @@ The LLM Proxy provides a unified API to multiple AI providers with expandable mo
 
 ### Supported Providers
 - **OpenAI**: GPT-4, GPT-3.5-turbo, GPT-4-turbo, GPT-4o
-- **Groq**: Llama 3.1 70B/8B, Mixtral 8x7B, Gemma 7B  
+- **Groq**: Llama 3.1 70B/8B, Mixtral 8x7B, Gemma 7B
 - **Claude**: Claude 3.5 Sonnet/Haiku, Claude 3 Opus/Sonnet/Haiku (via local proxy)
 - **Gemini**: Gemini Pro/Pro Vision, Gemini 1.5 Pro/Flash (via local proxy)
 
@@ -309,7 +309,7 @@ psql -d postgres -f init_openwebui_db.sql
 
 ### Custom PostgreSQL Setup
 The script automatically detects PostgreSQL installations:
-- Homebrew PostgreSQL (`/opt/homebrew/bin/psql`)  
+- Homebrew PostgreSQL (`/opt/homebrew/bin/psql`)
 - System PostgreSQL (`/usr/bin/psql`, `/usr/local/bin/psql`)
 - Postgres.app (`/Applications/Postgres.app/...`)
 
@@ -323,7 +323,7 @@ pip install pytest pytest-asyncio
 # Run all tests
 pytest tests/test_llm_proxy.py -v
 
-# Run specific test categories  
+# Run specific test categories
 pytest tests/test_llm_proxy.py::TestLLMProxy -v          # Unit tests
 pytest tests/test_llm_proxy.py -k "integration" -v       # Integration tests (requires API keys)
 
@@ -334,7 +334,7 @@ pytest tests/test_llm_proxy.py --cov=llm_proxy --cov-report=html
 ### Test Categories
 - **Unit Tests**: Provider configuration, model routing, error handling
 - **Integration Tests**: Real API calls (requires valid API keys)
-- **Configuration Tests**: providers.json validation
+- **Configuration Tests**: backends.json validation
 
 ### Using with Open-WebUI
 
@@ -344,7 +344,7 @@ pytest tests/test_llm_proxy.py --cov=llm_proxy --cov-report=html
    - Start both services: `./manage.sh start`
 
 2. **In Open-WebUI web interface:**
-   - Go to Settings → Connections  
+   - Go to Settings → Connections
    - Add custom OpenAI API connection
    - Set Base URL to: `http://localhost:8000/v1`
    - Use any of your configured API keys
