@@ -97,6 +97,7 @@ check_dependencies() {
 }
 
 start_open_webui() {
+    local extra_args="$@"
     echo "🚀 Starting Open-WebUI..."
     check_dependencies
 
@@ -109,11 +110,17 @@ start_open_webui() {
 
     echo "📊 Using database: $(echo $DATABASE_URL | cut -d'@' -f2 2>/dev/null || echo 'configured database')"
 
-    # Start Open-WebUI
-    exec venv/bin/open-webui serve --port ${OPENWEBUI_PORT:-8087} --host ${OPENWEBUI_HOST:-localhost}
+    # Start Open-WebUI with extra arguments
+    if [ -n "$extra_args" ]; then
+        echo "📋 Extra arguments: $extra_args"
+        exec venv/bin/open-webui serve --port ${OPENWEBUI_PORT:-8087} --host ${OPENWEBUI_HOST:-localhost} $extra_args
+    else
+        exec venv/bin/open-webui serve --port ${OPENWEBUI_PORT:-8087} --host ${OPENWEBUI_HOST:-localhost}
+    fi
 }
 
 start_llm_proxy() {
+    local extra_args="$@"
     echo "🚀 Starting LLM Proxy..."
     check_dependencies
 
@@ -129,8 +136,13 @@ start_llm_proxy() {
 
     echo "📊 Starting proxy on port ${LLM_PROXY_PORT:-8086}"
 
-    # Start LLM Proxy with uvicorn
-    exec venv/bin/python -m uvicorn src.openwebui_service.llm_proxy:app --host ${LLM_PROXY_HOST:-localhost} --port ${LLM_PROXY_PORT:-8086}
+    # Start LLM Proxy with uvicorn and extra arguments
+    if [ -n "$extra_args" ]; then
+        echo "📋 Extra arguments: $extra_args"
+        exec venv/bin/python -m uvicorn src.openwebui_service.llm_proxy:app --host ${LLM_PROXY_HOST:-localhost} --port ${LLM_PROXY_PORT:-8086} $extra_args
+    else
+        exec venv/bin/python -m uvicorn src.openwebui_service.llm_proxy:app --host ${LLM_PROXY_HOST:-localhost} --port ${LLM_PROXY_PORT:-8086}
+    fi
 }
 
 start_all_services() {
@@ -301,20 +313,26 @@ case "${1:-}" in
     "start")
         case "${2:-}" in
             "open-webui")
-                start_open_webui
+                shift 2  # Remove 'start' and 'open-webui'
+                start_open_webui "$@"
                 ;;
             "llm-proxy")
-                start_llm_proxy
+                shift 2  # Remove 'start' and 'llm-proxy'
+                start_llm_proxy "$@"
                 ;;
             "")
                 start_all_services
                 ;;
             *)
-                echo "Usage: $0 start [open-webui|llm-proxy]"
+                echo "Usage: $0 start [open-webui|llm-proxy] [extra-options...]"
                 echo ""
-                echo "  start              Start all services with PM2"
-                echo "  start open-webui   Start Open-WebUI only"
-                echo "  start llm-proxy    Start LLM Proxy only"
+                echo "  start                      Start all services with PM2"
+                echo "  start open-webui [opts]    Start Open-WebUI only with extra options"
+                echo "  start llm-proxy [opts]     Start LLM Proxy only with extra options"
+                echo ""
+                echo "Examples:"
+                echo "  $0 start llm-proxy --reload --log-level debug"
+                echo "  $0 start open-webui --dev"
                 exit 1
                 ;;
         esac
@@ -329,15 +347,19 @@ case "${1:-}" in
         echo "Usage: $0 {init|start|stop|status}"
         echo ""
         echo "Commands:"
-        echo "  init              Generate SQL file from template"
-        echo "  init -x           Generate and execute SQL file"
-        echo "  init models       Initialize models.json from example (legacy)"
-        echo "  init backends     Initialize backends.json from example"
-        echo "  start             Start all services with PM2"
-        echo "  start open-webui  Start Open-WebUI only"
-        echo "  start llm-proxy   Start LLM Proxy only"
-        echo "  stop              Stop all PM2 services"
-        echo "  status            Check service status"
+        echo "  init                       Generate SQL file from template"
+        echo "  init -x                    Generate and execute SQL file"
+        echo "  init models                Initialize models.json from example (legacy)"
+        echo "  init backends              Initialize backends.json from example"
+        echo "  start                      Start all services with PM2"
+        echo "  start open-webui [opts]    Start Open-WebUI only with extra options"
+        echo "  start llm-proxy [opts]     Start LLM Proxy only with extra options"
+        echo "  stop                       Stop all PM2 services"
+        echo "  status                     Check service status"
+        echo ""
+        echo "Examples:"
+        echo "  $0 start llm-proxy --reload --log-level debug"
+        echo "  $0 start open-webui --dev"
         exit 1
         ;;
 esac
