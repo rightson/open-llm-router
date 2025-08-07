@@ -8,6 +8,8 @@ venv/
 # Runtime files
 run/
 *.pyc
+build/
+*.egg-info
 
 # Configuration files (user-customizable)
 conf/models.json
