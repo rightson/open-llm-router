@@ -27,6 +27,7 @@ psql_paths=(
     "/usr/bin/psql"
     "/usr/local/bin/psql"
     "/opt/homebrew/bin/psql"
+    "/opt/homebrew/Cellar/postgresql@17/*/bin/psql"
     "/opt/homebrew/Cellar/postgresql@16/*/bin/psql"
     "/opt/homebrew/Cellar/postgresql@15/*/bin/psql"
     "/opt/homebrew/Cellar/postgresql@14/*/bin/psql"
@@ -210,6 +211,7 @@ module.exports = {
       name: 'open-webui',
       script: './venv/bin/open-webui',
       args: 'serve --port ${OPENWEBUI_PORT:-8087}',
+      interpreter: './venv/bin/python',
       env: {
         DATABASE_URL: '${DATABASE_URL}',
         OPENAI_API_KEY: '${OPENAI_API_KEY:-}',
@@ -217,7 +219,7 @@ module.exports = {
       },
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G'
+      max_memory_restart: '2G'
     },
     {
       name: 'llm-router',
