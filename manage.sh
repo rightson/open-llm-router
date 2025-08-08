@@ -90,9 +90,9 @@ check_dependencies() {
 
     # Check if PM2 is installed
     if ! command -v pm2 >/dev/null 2>&1; then
-        echo "❌ PM2 not found. Install it first:"
-        echo "  npm install -g pm2"
-        exit 1
+        echo "📦 PM2 not found. Installing pm2"
+        npm install -g pm2
+        echo "✅ pm2 installed"
     fi
 }
 
@@ -104,6 +104,13 @@ check_dependencies_llm_router() {
         echo "✅ Virtual environment created"
 
         echo "📦 Installing requirements..."
+        venv/bin/pip3 install -r requirements.txt
+        echo "✅ Requirements installed"
+    fi
+
+    # Check if uvicorn is available
+    if [ ! -x "venv/bin/uvicorn" ]; then
+        echo "📦 uvicorn not found. Installing requirements..."
         venv/bin/pip3 install -r requirements.txt
         echo "✅ Requirements installed"
     fi
@@ -202,7 +209,7 @@ module.exports = {
     {
       name: 'open-webui',
       script: './venv/bin/open-webui',
-      args: 'serve --port ${OPENWEBUI_PORT:-5487}',
+      args: 'serve --port ${OPENWEBUI_PORT:-8087}',
       env: {
         DATABASE_URL: '${DATABASE_URL}',
         OPENAI_API_KEY: '${OPENAI_API_KEY:-}',
@@ -239,7 +246,7 @@ EOF
     pm2 status
     echo ""
     echo "📊 Access points:"
-    echo "  Open-WebUI: http://localhost:${OPENWEBUI_PORT:-5487}"
+    echo "  Open-WebUI: http://localhost:${OPENWEBUI_PORT:-8087}"
     echo "  LLM Router: http://localhost:${LLM_ROUTER_PORT:-8086}"
     echo ""
     echo "PM2 commands:"
