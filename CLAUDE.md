@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an Open-WebUI service manager that provides:
+This is **Open LLM Router** - a self-hosted OpenRouter.ai alternative that provides:
+- Multi-provider LLM routing (OpenAI, Groq, Claude, Gemini) with OpenAI-compatible API
 - Complete PostgreSQL database setup for Open-WebUI
-- Multi-provider LLM proxy server (OpenAI, Groq, Claude, Gemini)
 - PM2-based process management for production deployments
 - Template-based database initialization
 
@@ -86,8 +86,8 @@ flake8 src/ tests/
 
 ### Core Components
 
-**LLM Proxy (`src/openwebui_service/llm_proxy.py`)**
-- FastAPI application providing unified API to multiple AI providers
+**Open LLM Router (`src/openwebui_service/llm_proxy.py`)**
+- FastAPI application providing unified API to multiple AI providers (self-hosted OpenRouter.ai alternative)
 - Supports OpenAI, Groq, Claude, and Gemini models with full OpenAI compatibility
 - Modular architecture with provider-specific handlers
 - OpenAI-compatible API endpoints with streaming support

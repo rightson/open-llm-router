@@ -1,17 +1,63 @@
-# Open-WebUI + LLM Proxy Service Manager
+# Open LLM Router - Self-Hosted OpenRouter.ai Alternative
 
-A complete service management solution for running Open-WebUI with PostgreSQL database and multi-provider LLM proxy. Includes database initialization, service management, and configuration templates.
+A complete self-hosted LLM routing solution that provides unified access to multiple AI providers through an OpenAI-compatible API. Designed specifically for Open-WebUI with PostgreSQL database support, service management, and configuration templates.
 
 ## Features
 
-- **Database Management**: Automatic PostgreSQL database and user setup
-- **Multi-Service Management**: Start/stop Open-WebUI and LLM Proxy independently or together
-- **LLM Proxy**: Route requests to multiple AI providers (OpenAI, Groq, Claude, Gemini)
+- **Multi-Provider LLM Routing**: Route requests to OpenAI, Groq, Claude, and Gemini through a single API
+- **OpenAI-Compatible API**: Drop-in replacement for OpenRouter.ai with the same `/v1/chat/completions` interface
+- **Open-WebUI Integration**: Purpose-built for seamless Open-WebUI deployment with PostgreSQL
+- **No Markup Costs**: Use your own API keys directly without additional fees
+- **Data Privacy**: All requests stay on your infrastructure - never sent to third parties
 - **PM2 Integration**: Production-ready process management with auto-restart
 - **Template System**: SQL templates with environment variable substitution
 - **Multi-Platform**: Supports Homebrew PostgreSQL, system PostgreSQL, and Postgres.app
 - **Comprehensive Testing**: Pytest suite for API verification
 - **Idempotent Operations**: Safe to run multiple times
+
+## Why Choose This Self-Hosted Solution?
+
+This service is a **self-hosted alternative to OpenRouter.ai** and similar commercial LLM routing services. It provides the same unified API experience while giving you complete control over your data and costs.
+
+### Comparison with Hosted Services
+
+| Feature | Hosted Services (OpenRouter.ai) | This Self-Hosted Solution |
+|---------|--------------------------------|---------------------------|
+| **Deployment** | Cloud-hosted, managed service | Self-hosted on your infrastructure |
+| **Cost Model** | Pay-per-use with markup (20-50%+) | Direct API costs only (no markup) |
+| **Available Models** | 100+ models from many providers | ~10 models across 4 major providers |
+| **Data Privacy** | Requests go through third-party servers | All requests stay on your infrastructure |
+| **Customization** | Limited to provided configurations | Full control over providers, routing, configs |
+| **Setup Complexity** | Instant signup and use | Requires setup and maintenance |
+| **Infrastructure** | Fully managed, high availability | You manage scaling and reliability |
+| **Integration** | Generic API endpoint | Designed specifically for Open-WebUI |
+
+### Key Benefits of Self-Hosting
+
+🔒 **Privacy First**: Your conversations and API requests never leave your infrastructure
+
+💰 **Cost Effective**: Eliminate markup fees - pay only direct API costs to providers
+
+🎛️ **Full Control**: Customize model routing, add custom providers, modify response handling
+
+🔧 **Open Source**: Inspect, modify, and extend the codebase to fit your needs
+
+🏠 **Local Integration**: Purpose-built for Open-WebUI with optimized configuration management
+
+### When to Choose Each Option
+
+**Choose Hosted Services (OpenRouter.ai) if you:**
+- Want instant setup with no infrastructure management
+- Need access to 100+ models from many providers
+- Prefer predictable per-request pricing
+- Don't have technical resources for self-hosting
+
+**Choose This Self-Hosted Solution if you:**
+- Want to minimize API costs and avoid markup fees
+- Require data privacy and on-premises processing
+- Need custom provider configurations or model routing
+- Already run Open-WebUI and want integrated LLM routing
+- Want to contribute to or modify the LLM proxy functionality
 
 ## Requirements
 
@@ -164,9 +210,9 @@ GEMINI_API_KEY=your_gemini_api_key_here
 └── venv/                          # Virtual environment (created by user)
 ```
 
-## LLM Proxy Features
+## Open LLM Router Features
 
-The LLM Proxy provides a unified API to multiple AI providers with expandable model configurations:
+Open LLM Router provides a unified API to multiple AI providers with expandable model configurations:
 
 ### Supported Providers
 - **OpenAI**: GPT-4o, GPT-4.1, O3 (direct integration)
@@ -230,7 +276,7 @@ The LLM Proxy provides a unified API to multiple AI providers with expandable mo
 
 ### Claude Integration Features
 
-The LLM Proxy includes full Claude integration with OpenAI API compatibility:
+Open LLM Router includes full Claude integration with OpenAI API compatibility:
 
 **Message Processing:**
 - Automatic conversion from OpenAI message format to Anthropic format
@@ -388,8 +434,8 @@ pytest tests/test_llm_proxy.py --cov=llm_proxy --cov-report=html
 
 ### Using with Open-WebUI
 
-1. **Configure Open-WebUI to use the proxy:**
-   - Set LLM proxy URL: `http://localhost:8086`
+1. **Configure Open-WebUI to use Open LLM Router:**
+   - Set LLM router URL: `http://localhost:8086`
    - Add your API keys to `.env`
    - Start both services: `./manage.sh start`
 
@@ -426,4 +472,4 @@ OPENAI_API_BASE_URL=https://api.openai.com/v1
 
 ## License
 
-This service manager is provided as-is for setting up Open-WebUI with PostgreSQL databases.
+Open LLM Router is provided as-is for self-hosting LLM routing services with Open-WebUI integration.
