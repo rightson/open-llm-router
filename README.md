@@ -13,6 +13,12 @@ A complete service management solution for running Open-WebUI with PostgreSQL da
 - **Comprehensive Testing**: Pytest suite for API verification
 - **Idempotent Operations**: Safe to run multiple times
 
+## Requirements
+
+- **Python 3.11+** (required for Open-WebUI)
+- **PostgreSQL** (for database)
+- **PM2** (for production process management, optional for individual services)
+
 ## Quick Start
 
 1. **Setup environment:**
@@ -21,16 +27,16 @@ A complete service management solution for running Open-WebUI with PostgreSQL da
 cp .env.example .env
 # Edit .env with your database and API credentials
 
-# Install dependencies
+# Dependencies are automatically installed when starting services
+# OR install manually:
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-pip install open-webui
 
 # Optional: Install package in development mode
 pip install -e .
 
-# Install PM2 for process management
+# Install PM2 for process management (only needed for ./manage.sh start)
 npm install -g pm2
 ```
 
@@ -42,11 +48,11 @@ npm install -g pm2
 
 3. **Start services:**
 ```bash
-# Start all services with PM2
+# Start all services with PM2 (requires PM2)
 ./manage.sh start
 
-# OR start services individually:
-./manage.sh start open-webui    # Start Open-WebUI only
+# OR start services individually (auto-installs dependencies):
+./manage.sh start open-webui    # Start Open-WebUI only (requires Python 3.11+)
 ./manage.sh start llm-proxy     # Start LLM Proxy only
 ```
 
@@ -72,8 +78,8 @@ npm install -g pm2
 # Start all services with PM2
 ./manage.sh start
 
-# Start individual services
-./manage.sh start open-webui    # Open-WebUI only
+# Start individual services (auto-installs dependencies)
+./manage.sh start open-webui    # Open-WebUI only (requires Python 3.11+)
 ./manage.sh start llm-proxy     # LLM Proxy only
 
 # Stop all services
@@ -118,8 +124,8 @@ DB_HOST=localhost
 DB_PORT=5432
 
 # Service Ports
-OPENWEBUI_PORT=5487
-LLM_PROXY_PORT=8000
+OPENWEBUI_PORT=8087
+LLM_PROXY_PORT=8086
 
 # Database URL for Open-WebUI (constructed from above variables)
 DATABASE_URL=postgresql://${OPENWEBUI_DB_USER}:${OPENWEBUI_DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${OPENWEBUI_DB_NAME}
@@ -257,7 +263,7 @@ The LLM Proxy includes full Claude integration with OpenAI API compatibility:
 ### Usage Examples
 ```bash
 # Test the proxy
-curl -X POST http://localhost:8000/v1/chat/completions \
+curl -X POST http://localhost:8086/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-api-key" \
   -d '{
@@ -266,10 +272,10 @@ curl -X POST http://localhost:8000/v1/chat/completions \
   }'
 
 # List available models
-curl http://localhost:8000/v1/models
+curl http://localhost:8086/v1/models
 
 # Use Claude model with streaming
-curl -X POST http://localhost:8000/v1/chat/completions \
+curl -X POST http://localhost:8086/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-claude-api-key" \
   -d '{
@@ -279,7 +285,7 @@ curl -X POST http://localhost:8000/v1/chat/completions \
   }'
 
 # Use Claude model alias
-curl -X POST http://localhost:8000/v1/chat/completions \
+curl -X POST http://localhost:8086/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-claude-api-key" \
   -d '{
@@ -288,10 +294,10 @@ curl -X POST http://localhost:8000/v1/chat/completions \
   }'
 
 # Reload backends after editing conf/backends.json
-curl -X POST http://localhost:8000/admin/reload-backends
+curl -X POST http://localhost:8086/admin/reload-backends
 
 # List configured backends
-curl http://localhost:8000/admin/backends
+curl http://localhost:8086/admin/backends
 ```
 
 ## Database Setup Details
@@ -325,16 +331,16 @@ Solution: Install PostgreSQL via Homebrew: `brew install postgresql`
 ```
 Solution: Ensure PostgreSQL is running: `brew services start postgresql`
 
-**Virtual environment missing:**
+**Python version too old (for Open-WebUI):**
 ```bash
-❌ Virtual environment not found.
+❌ open-webui requires Python 3.11+, but found Python 3.10
 ```
-Solution: Create venv and install Open-WebUI:
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install open-webui
-```
+Solution: Install Python 3.11+ and ensure `python3` points to it
+
+**Dependencies automatically handled:**
+- Virtual environment is created automatically when starting services
+- Requirements are installed automatically when needed
+- Open-WebUI installation is handled automatically
 
 ### Manual Database Setup
 
@@ -383,14 +389,14 @@ pytest tests/test_llm_proxy.py --cov=llm_proxy --cov-report=html
 ### Using with Open-WebUI
 
 1. **Configure Open-WebUI to use the proxy:**
-   - Set LLM proxy URL: `http://localhost:8000`
+   - Set LLM proxy URL: `http://localhost:8086`
    - Add your API keys to `.env`
    - Start both services: `./manage.sh start`
 
 2. **In Open-WebUI web interface:**
    - Go to Settings → Connections
    - Add custom OpenAI API connection
-   - Set Base URL to: `http://localhost:8000/v1`
+   - Set Base URL to: `http://localhost:8086/v1`
    - Use any of your configured API keys
    - Select models: GPT-4, Llama, Claude, Gemini
 

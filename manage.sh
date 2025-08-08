@@ -96,17 +96,53 @@ check_dependencies() {
     fi
 }
 
+check_dependencies_llm_proxy() {
+    # Check if virtual environment exists
+    if [ ! -d "venv" ]; then
+        echo "📦 Virtual environment not found. Creating it..."
+        python3 -m venv venv
+        echo "✅ Virtual environment created"
+        
+        echo "📦 Installing requirements..."
+        venv/bin/pip3 install -r requirements.txt
+        echo "✅ Requirements installed"
+    fi
+}
+
+check_dependencies_open_webui() {
+    # Check Python version (open-webui requires Python 3.11+)
+    python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    required_version="3.11"
+    
+    if ! python3 -c "import sys; exit(0 if sys.version_info >= (3, 11) else 1)" 2>/dev/null; then
+        echo "❌ open-webui requires Python 3.11+, but found Python $python_version"
+        echo "Please install Python 3.11+ and ensure 'python3' points to it"
+        exit 1
+    fi
+    
+    # Check if virtual environment exists
+    if [ ! -d "venv" ]; then
+        echo "📦 Virtual environment not found. Creating it..."
+        python3 -m venv venv
+        echo "✅ Virtual environment created"
+        
+        echo "📦 Installing requirements..."
+        venv/bin/pip3 install -r requirements.txt
+        echo "✅ Requirements installed"
+    fi
+    
+    # Check if open-webui is available
+    if [ ! -x "venv/bin/open-webui" ]; then
+        echo "📦 open-webui not found. Installing requirements..."
+        venv/bin/pip3 install -r requirements.txt
+        echo "✅ Requirements installed"
+    fi
+}
+
 start_open_webui() {
     local extra_args="$@"
     echo "🚀 Starting Open-WebUI..."
-    check_dependencies
-
-    if [ ! -x "venv/bin/open-webui" ]; then
-        echo "❌ open-webui not found in virtual environment. Install it first:"
-        echo "  source venv/bin/activate"
-        echo "  pip install open-webui"
-        exit 1
-    fi
+    check_dependencies_open_webui
 
     echo "📊 Using database: $(echo $DATABASE_URL | cut -d'@' -f2 2>/dev/null || echo 'configured database')"
 
@@ -122,7 +158,7 @@ start_open_webui() {
 start_llm_proxy() {
     local extra_args="$@"
     echo "🚀 Starting LLM Proxy..."
-    check_dependencies
+    check_dependencies_llm_proxy
 
     if [ ! -f "src/openwebui_service/llm_proxy.py" ]; then
         echo "❌ src/openwebui_service/llm_proxy.py not found"
@@ -153,12 +189,6 @@ start_all_services() {
     pm2 delete open-webui llm-proxy 2>/dev/null || true
 
     # Start Open-WebUI with PM2
-    if [ ! -x "venv/bin/open-webui" ]; then
-        echo "❌ open-webui not found in virtual environment. Install it first:"
-        echo "  source venv/bin/activate"
-        echo "  pip install open-webui"
-        exit 1
-    fi
 
     echo "📊 Using database: $(echo $DATABASE_URL | cut -d'@' -f2 2>/dev/null || echo 'configured database')"
 

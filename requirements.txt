@@ -1,5 +1,6 @@
 # Core dependencies
-python-dotenv>=1.0.0
+python-dotenv
+open-webui
 
 # LLM Proxy dependencies
 fastapi>=0.100.0

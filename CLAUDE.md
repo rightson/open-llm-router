@@ -2,7 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Development Commands
+## Project Overview
+
+This is an Open-WebUI service manager that provides:
+- Complete PostgreSQL database setup for Open-WebUI
+- Multi-provider LLM proxy server (OpenAI, Groq, Claude, Gemini)
+- PM2-based process management for production deployments
+- Template-based database initialization
+
+## Essential Commands
 
 ### Environment Setup
 ```bash
@@ -208,7 +216,7 @@ The proxy currently supports the following models across 4 providers:
 
 **Model Aliases (preserve major/minor versions, remove datecodes):**
 - `gpt-4.1` → `gpt-4.1`
-- `grok-4` → `grok-4` 
+- `grok-4` → `grok-4`
 - `claude-sonnet-4` → `claude-sonnet-4-20250514`
 - `claude-opus-4.1` → `claude-opus-4-1-20250805`
 - `gemini-2.5` → `gemini-2.5-pro`
