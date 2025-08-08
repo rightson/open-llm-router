@@ -1,4 +1,4 @@
-# Open LLM Router - Self-Hosted OpenRouter.ai Alternative
+# Open LLM Router - Self-Hosted AI Gateway
 
 A complete self-hosted LLM routing solution that provides unified access to multiple AI providers through an OpenAI-compatible API. Designed specifically for Open-WebUI with PostgreSQL database support, service management, and configuration templates.
 
