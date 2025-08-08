@@ -59,7 +59,7 @@ generate_sql() {
     echo "🗄️  Generating SQL from template..."
     # Ensure run directory exists
     mkdir -p run
-    python3 -m src.openwebui_service.pg_init -e .env -o run/init_openwebui_db.sql
+    python3 -m src.open_llm_router.pg_init -e .env -o run/init_openwebui_db.sql
     echo "✅ SQL file generated: run/init_openwebui_db.sql"
 }
 
@@ -96,13 +96,13 @@ check_dependencies() {
     fi
 }
 
-check_dependencies_llm_proxy() {
+check_dependencies_llm_router() {
     # Check if virtual environment exists
     if [ ! -d "venv" ]; then
         echo "📦 Virtual environment not found. Creating it..."
         python3 -m venv venv
         echo "✅ Virtual environment created"
-        
+
         echo "📦 Installing requirements..."
         venv/bin/pip3 install -r requirements.txt
         echo "✅ Requirements installed"
@@ -113,24 +113,24 @@ check_dependencies_open_webui() {
     # Check Python version (open-webui requires Python 3.11+)
     python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
     required_version="3.11"
-    
+
     if ! python3 -c "import sys; exit(0 if sys.version_info >= (3, 11) else 1)" 2>/dev/null; then
         echo "❌ open-webui requires Python 3.11+, but found Python $python_version"
         echo "Please install Python 3.11+ and ensure 'python3' points to it"
         exit 1
     fi
-    
+
     # Check if virtual environment exists
     if [ ! -d "venv" ]; then
         echo "📦 Virtual environment not found. Creating it..."
         python3 -m venv venv
         echo "✅ Virtual environment created"
-        
+
         echo "📦 Installing requirements..."
         venv/bin/pip3 install -r requirements.txt
         echo "✅ Requirements installed"
     fi
-    
+
     # Check if open-webui is available
     if [ ! -x "venv/bin/open-webui" ]; then
         echo "📦 open-webui not found. Installing requirements..."
@@ -155,13 +155,13 @@ start_open_webui() {
     fi
 }
 
-start_llm_proxy() {
+start_llm_router() {
     local extra_args="$@"
-    echo "🚀 Starting LLM Proxy..."
-    check_dependencies_llm_proxy
+    echo "🚀 Starting LLM Router..."
+    check_dependencies_llm_router
 
-    if [ ! -f "src/openwebui_service/llm_proxy.py" ]; then
-        echo "❌ src/openwebui_service/llm_proxy.py not found"
+    if [ ! -f "src/open_llm_router/llm_router.py" ]; then
+        echo "❌ src/open_llm_router/llm_router.py not found"
         exit 1
     fi
 
@@ -170,14 +170,14 @@ start_llm_proxy() {
         echo "⚠️  Warning: No API keys configured. Add at least one API key to .env"
     fi
 
-    echo "📊 Starting proxy on port ${LLM_PROXY_PORT:-8086}"
+    echo "📊 Starting router on port ${LLM_ROUTER_PORT:-8086}"
 
-    # Start LLM Proxy with uvicorn and extra arguments
+    # Start LLM Router with uvicorn and extra arguments
     if [ -n "$extra_args" ]; then
         echo "📋 Extra arguments: $extra_args"
-        exec venv/bin/python -m uvicorn src.openwebui_service.llm_proxy:app --host ${LLM_PROXY_HOST:-localhost} --port ${LLM_PROXY_PORT:-8086} $extra_args
+        exec venv/bin/python -m uvicorn src.open_llm_router.llm_router:app --host ${LLM_ROUTER_HOST:-localhost} --port ${LLM_ROUTER_PORT:-8086} $extra_args
     else
-        exec venv/bin/python -m uvicorn src.openwebui_service.llm_proxy:app --host ${LLM_PROXY_HOST:-localhost} --port ${LLM_PROXY_PORT:-8086}
+        exec venv/bin/python -m uvicorn src.open_llm_router.llm_router:app --host ${LLM_ROUTER_HOST:-localhost} --port ${LLM_ROUTER_PORT:-8086}
     fi
 }
 
@@ -186,7 +186,7 @@ start_all_services() {
     check_dependencies
 
     # Stop existing PM2 processes
-    pm2 delete open-webui llm-proxy 2>/dev/null || true
+    pm2 delete open-webui llm-router 2>/dev/null || true
 
     # Start Open-WebUI with PM2
 
@@ -213,9 +213,9 @@ module.exports = {
       max_memory_restart: '1G'
     },
     {
-      name: 'llm-proxy',
+      name: 'llm-router',
       script: './venv/bin/python',
-      args: '-m uvicorn src.openwebui_service.llm_proxy:app --host ${LLM_PROXY_HOST:-localhost} --port ${LLM_PROXY_PORT:-8086}',
+      args: '-m uvicorn src.open_llm_router.llm_router:app --host ${LLM_ROUTER_HOST:-localhost} --port ${LLM_ROUTER_PORT:-8086}',
       env: {
         OPENAI_API_KEY: '${OPENAI_API_KEY:-}',
         GROK_API_KEY: '${GROK_API_KEY:-}',
@@ -240,7 +240,7 @@ EOF
     echo ""
     echo "📊 Access points:"
     echo "  Open-WebUI: http://localhost:${OPENWEBUI_PORT:-5487}"
-    echo "  LLM Proxy:  http://localhost:${LLM_PROXY_PORT:-8086}"
+    echo "  LLM Router: http://localhost:${LLM_ROUTER_PORT:-8086}"
     echo ""
     echo "PM2 commands:"
     echo "  pm2 status          # Check status"
@@ -252,7 +252,7 @@ EOF
 
 stop_services() {
     echo "🛑 Stopping services..."
-    pm2 delete open-webui llm-proxy 2>/dev/null || true
+    pm2 delete open-webui llm-router 2>/dev/null || true
     echo "✅ All services stopped"
 }
 
@@ -346,22 +346,22 @@ case "${1:-}" in
                 shift 2  # Remove 'start' and 'open-webui'
                 start_open_webui "$@"
                 ;;
-            "llm-proxy")
-                shift 2  # Remove 'start' and 'llm-proxy'
-                start_llm_proxy "$@"
+            "llm-router")
+                shift 2  # Remove 'start' and 'llm-router'
+                start_llm_router "$@"
                 ;;
             "")
                 start_all_services
                 ;;
             *)
-                echo "Usage: $0 start [open-webui|llm-proxy] [extra-options...]"
+                echo "Usage: $0 start [open-webui|llm-router] [extra-options...]"
                 echo ""
                 echo "  start                      Start all services with PM2"
                 echo "  start open-webui [opts]    Start Open-WebUI only with extra options"
-                echo "  start llm-proxy [opts]     Start LLM Proxy only with extra options"
+                echo "  start llm-router [opts]     Start LLM Router only with extra options"
                 echo ""
                 echo "Examples:"
-                echo "  $0 start llm-proxy --reload --log-level debug"
+                echo "  $0 start llm-router --reload --log-level debug"
                 echo "  $0 start open-webui --dev"
                 exit 1
                 ;;
@@ -383,12 +383,12 @@ case "${1:-}" in
         echo "  init backends              Initialize backends.json from example"
         echo "  start                      Start all services with PM2"
         echo "  start open-webui [opts]    Start Open-WebUI only with extra options"
-        echo "  start llm-proxy [opts]     Start LLM Proxy only with extra options"
+        echo "  start llm-router [opts]     Start LLM Router only with extra options"
         echo "  stop                       Stop all PM2 services"
         echo "  status                     Check service status"
         echo ""
         echo "Examples:"
-        echo "  $0 start llm-proxy --reload --log-level debug"
+        echo "  $0 start llm-router --reload --log-level debug"
         echo "  $0 start open-webui --dev"
         exit 1
         ;;

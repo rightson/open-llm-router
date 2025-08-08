@@ -47,7 +47,7 @@ Repository = "https://github.com/open-webui/service-manager.git"
 Issues = "https://github.com/open-webui/service-manager/issues"
 
 [project.scripts]
-openwebui-init = "src.openwebui_service.pg_init:main"
+openwebui-init = "src.open_llm_router.pg_init:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

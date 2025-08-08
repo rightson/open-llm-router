@@ -1,5 +1,5 @@
 """
-Pytest tests for LLM Proxy API verification
+Pytest tests for LLM Router API verification
 Tests all backends defined in backends.json
 """
 
@@ -14,11 +14,11 @@ from fastapi.testclient import TestClient
 import sys
 
 sys.path.insert(0, "..")
-from src.openwebui_service.llm_proxy import app  # noqa: E402
+from src.open_llm_router.llm_router import app  # noqa: E402
 
 
-class TestLLMProxy:
-    """Test suite for LLM Proxy functionality"""
+class TestLLMRouter:
+    """Test suite for LLM Router functionality"""
 
     def setup_class(self):
         """Setup test class with backends configuration"""
@@ -73,7 +73,7 @@ class TestLLMProxy:
 
         for model in test_cases:
             # Import the routing function
-            from src.openwebui_service.llm_proxy import choose_backend
+            from src.open_llm_router.llm_router import choose_backend
 
             # Mock environment variable
             with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
@@ -86,7 +86,7 @@ class TestLLMProxy:
         test_cases = ["grok-4-latest", "grok-3-latest"]
 
         for model in test_cases:
-            from src.openwebui_service.llm_proxy import choose_backend
+            from src.open_llm_router.llm_router import choose_backend
 
             with patch.dict(os.environ, {"GROK_API_KEY": "test-grok-key"}):
                 backend = choose_backend(model)
@@ -98,7 +98,7 @@ class TestLLMProxy:
         test_cases = ["claude-opus-4-1-20250805", "claude-sonnet-4-20250514"]
 
         for model in test_cases:
-            from src.openwebui_service.llm_proxy import choose_backend
+            from src.open_llm_router.llm_router import choose_backend
 
             with patch.dict(os.environ, {"CLAUDE_API_KEY": "test-claude-key"}):
                 backend = choose_backend(model)
@@ -110,7 +110,7 @@ class TestLLMProxy:
         test_cases = ["gemini-2.5-pro", "gemini-2.5-flash"]
 
         for model in test_cases:
-            from src.openwebui_service.llm_proxy import choose_backend
+            from src.open_llm_router.llm_router import choose_backend
 
             with patch.dict(os.environ, {"GEMINI_API_KEY": "test-gemini-key"}):
                 backend = choose_backend(model)
@@ -119,7 +119,7 @@ class TestLLMProxy:
 
     def test_unknown_model_error(self):
         """Test that unknown models raise appropriate errors"""
-        from src.openwebui_service.llm_proxy import choose_backend
+        from src.open_llm_router.llm_router import choose_backend
         from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
@@ -199,7 +199,7 @@ class TestLLMProxy:
 
     def test_model_coverage(self):
         """Test that models from backends.example.json are covered by routing logic"""
-        from src.openwebui_service.llm_proxy import choose_backend, BACKENDS_CONFIG
+        from src.open_llm_router.llm_router import choose_backend, BACKENDS_CONFIG
 
         # Test each backend's models from the loaded configuration
         backends = BACKENDS_CONFIG.get("backends", {})
@@ -227,7 +227,7 @@ class TestLLMProxy:
 
     def test_model_aliases(self):
         """Test that model aliases work correctly"""
-        from src.openwebui_service.llm_proxy import (
+        from src.open_llm_router.llm_router import (
             get_backend_for_model,
             BACKENDS_CONFIG,
         )
@@ -244,7 +244,7 @@ class TestLLMProxy:
 
     def test_backend_headers_template(self):
         """Test that backend headers are properly formatted"""
-        from src.openwebui_service.llm_proxy import choose_backend, BACKENDS_CONFIG
+        from src.open_llm_router.llm_router import choose_backend, BACKENDS_CONFIG
 
         backends = BACKENDS_CONFIG.get("backends", {})
         for backend_name, backend_config in backends.items():
@@ -293,8 +293,8 @@ class TestLLMProxy:
             assert model["object"] == "model"
 
 
-class TestLLMProxyIntegration:
-    """Integration tests for LLM Proxy with external APIs"""
+class TestLLMRouterIntegration:
+    """Integration tests for LLM Router with external APIs"""
 
     def setup_class(self):
         """Setup integration test class"""

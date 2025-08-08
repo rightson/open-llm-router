@@ -6,11 +6,11 @@ import httpx
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("llm_proxy")
+logger = logging.getLogger("llm_router")
 
 
 class ProxyLogger:
-    def __init__(self, name: str = "llm_proxy"):
+    def __init__(self, name: str = "llm_router"):
         self.logger = logging.getLogger(name)
 
     def info(self, message: str, **kwargs):

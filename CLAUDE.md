@@ -50,7 +50,7 @@ cp .env.example .env
 
 # Start individual services
 ./manage.sh start open-webui    # Open-WebUI only
-./manage.sh start llm-proxy     # LLM Proxy only
+./manage.sh start llm-router     # LLM Router only
 
 # Stop all services
 ./manage.sh stop
@@ -59,15 +59,15 @@ cp .env.example .env
 ### Testing
 ```bash
 # Run all tests
-pytest tests/test_llm_proxy.py -v
+pytest tests/test_llm_router.py -v
 
 # Run specific test categories
-pytest tests/test_llm_proxy.py::TestLLMProxy -v          # Unit tests
-pytest tests/test_llm_proxy.py::TestLLMProxyIntegration -v  # Integration tests (requires API keys)
+pytest tests/test_llm_router.py::TestLLMRouter -v          # Unit tests
+pytest tests/test_llm_router.py::TestLLMRouterIntegration -v  # Integration tests (requires API keys)
 
 # Run tests with coverage
 pip install pytest-cov
-pytest tests/test_llm_proxy.py --cov=src.openwebui_service.llm_proxy --cov-report=html
+pytest tests/test_llm_router.py --cov=src.open_llm_router.llm_router --cov-report=html
 ```
 
 ### Code Quality
@@ -86,25 +86,25 @@ flake8 src/ tests/
 
 ### Core Components
 
-**Open LLM Router (`src/openwebui_service/llm_proxy.py`)**
+**Open LLM Router (`src/open_llm_router/llm_router.py`)**
 - FastAPI application providing unified API to multiple AI providers (self-hosted OpenRouter.ai alternative)
 - Supports OpenAI, Groq, Claude, and Gemini models with full OpenAI compatibility
 - Modular architecture with provider-specific handlers
 - OpenAI-compatible API endpoints with streaming support
 - Enhanced logging with upstream provider request/response timing and status codes
 
-**Utility Modules (`src/openwebui_service/utils/`)**
+**Utility Modules (`src/open_llm_router/utils/`)**
 - **Logger (`utils/logger.py`)**: Enhanced logging with upstream API provider tracking, request/response timing, and status codes
 - **Config (`utils/config.py`)**: Backend configuration loading with support for both new and legacy formats
 - **Model Router (`utils/model_router.py`)**: Model-to-backend routing, API key management, and backend selection
 
-**Provider Modules (`src/openwebui_service/providers/`)**
+**Provider Modules (`src/open_llm_router/providers/`)**
 - **Base Provider (`providers/base.py`)**: Common functionality for error handling, response formatting, and streaming
 - **Claude Provider (`providers/claude.py`)**: Anthropic API integration with message format conversion and streaming support
 - **Gemini Provider (`providers/gemini.py`)**: Google Gemini API integration with specialized streaming parser
 - **OpenAI Provider (`providers/openai.py`)**: Handles OpenAI and OpenAI-compatible providers (Groq, etc.)
 
-**Database Initializer (`src/openwebui_service/pg_init.py`)**
+**Database Initializer (`src/open_llm_router/pg_init.py`)**
 - PostgreSQL database setup utility using SQL templates
 - Environment variable substitution for secure configuration
 - Creates databases, users, and permissions for Open-WebUI
@@ -144,7 +144,7 @@ flake8 src/ tests/
 
 **Multi-Service Architecture**
 - Open-WebUI as primary web interface
-- LLM Proxy as backend API gateway
+- LLM Router as backend API gateway
 - PostgreSQL database for data persistence
 - PM2 for production process management
 
@@ -171,7 +171,7 @@ flake8 src/ tests/
 
 ## Important Notes
 
-- **Modular Architecture**: The LLM proxy is now organized into focused modules for better maintainability
+- **Modular Architecture**: The LLM router is now organized into focused modules for better maintainability
 - **Enhanced Logging**: INFO logger displays upstream provider, timing, and status codes for all requests
 - **Backward Compatibility**: All existing functionality and APIs remain unchanged
 - **Configuration**: Backend configurations in `conf/backends.json` (falls back to `conf/backends.example.json`)
@@ -182,8 +182,8 @@ flake8 src/ tests/
 ## File Structure
 
 ```
-src/openwebui_service/
-├── llm_proxy.py              # Main FastAPI application
+src/open_llm_router/
+├── llm_router.py              # Main FastAPI application
 ├── pg_init.py                # Database initialization
 ├── utils/                    # Utility modules
 │   ├── __init__.py
@@ -200,7 +200,7 @@ src/openwebui_service/
 
 ## Supported Models
 
-The proxy currently supports the following models across 4 providers:
+The router currently supports the following models across 4 providers:
 
 **OpenAI Models:**
 - `gpt-4o`, `gpt-4.1`, `o3`
