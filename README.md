@@ -1,5 +1,7 @@
 # Open LLM Router - Self-Hosted AI Gateway
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A complete self-hosted LLM routing solution that provides unified access to multiple AI providers through an OpenAI-compatible API. Designed specifically for Open-WebUI with PostgreSQL database support, service management, and configuration templates.
 
 ## Features
@@ -472,4 +474,4 @@ OPENAI_API_BASE_URL=https://api.openai.com/v1
 
 ## License
 
-Open LLM Router is provided as-is for self-hosting LLM routing services with Open-WebUI integration.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
