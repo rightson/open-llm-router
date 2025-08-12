@@ -1,23 +1,39 @@
-# Open LLM Router - Self-Hosted AI Gateway
+# Open LLM Router - Lightweight Router for Open-WebUI
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Self-hosted LLM routing with OpenAI-compatible API for multiple providers. Purpose-built for Open-WebUI with message format conversion and unified model access.
+Simple, self-hosted LLM routing for Open-WebUI installations. Provides OpenAI-compatible API for 4 major providers with message format conversion.
 
-## Why This vs Open-WebUI's Native Configuration?
+## When to Use This
+
+**✅ Good Fit:**
+- Small teams running Open-WebUI locally
+- Simple setups needing 4-5 providers (OpenAI, Groq, Claude, Gemini)
+- On-premises deployments with strict data control requirements
+- Minimal infrastructure and maintenance overhead preferred
+
+**❌ Consider Alternatives:**
+- **Production/Enterprise**: Use [OpenRouter.ai](https://openrouter.ai) (400+ models, automatic failover, enterprise features)
+- **Complex Routing**: Use [LiteLLM](https://litellm.ai) (100+ providers, load balancing, advanced features)
+- **Single Provider**: Use Open-WebUI's native configuration
+
+## Features
 
 - **Format Conversion**: Auto-converts OpenAI messages to Claude/Gemini formats
 - **Model Aliasing**: Smart routing (e.g., `claude-sonnet-4` → `claude-sonnet-4-20250514`)
 - **Streaming Compatibility**: Converts provider streaming to OpenAI SSE format
-- **Cost Savings**: Direct API calls without markup fees (vs OpenRouter.ai)
-- **Privacy**: All requests stay on your infrastructure
+- **Direct API Access**: No markup fees, full control over API keys
+- **Open-WebUI Integration**: Built-in PostgreSQL setup and PM2 management
 
-## Supported Models
+## Supported Models (Limited Scope)
 
-**OpenAI**: `gpt-4o`, `gpt-4.1`, `o3`
-**Groq**: `grok-4`, `grok-3`
-**Claude**: `claude-opus-4.1`, `claude-sonnet-4` (with format conversion)
-**Gemini**: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`
+**4 Providers, ~10 Models:**
+- **OpenAI**: `gpt-4o`, `gpt-4.1`, `o3`
+- **Groq**: `grok-4`, `grok-3`
+- **Claude**: `claude-opus-4.1`, `claude-sonnet-4` (with format conversion)
+- **Gemini**: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`
+
+*For access to 400+ models, use [OpenRouter.ai](https://openrouter.ai) instead.*
 
 ## Quick Start
 
@@ -123,10 +139,18 @@ src/open_llm_router/
 
 **Key Features**:
 - Provider-specific message format conversion
-- Intelligent model routing with aliases
+- Basic model routing with aliases
 - OpenAI-compatible streaming for all providers
 - Enhanced logging with request timing and status codes
 - Template-based database initialization
+
+## Limitations
+
+- **Limited Scale**: 4 providers vs 400+ in OpenRouter.ai
+- **No Failover**: Single provider per model, no automatic fallback
+- **Basic Routing**: No intelligent load balancing or provider selection
+- **Maintenance Overhead**: Self-hosted setup and updates required
+- **Feature Gap**: Missing enterprise features (analytics, spend tracking, etc.)
 
 ## License
 
