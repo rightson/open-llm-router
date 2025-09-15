@@ -335,6 +335,94 @@ init_backends() {
     fi
 }
 
+# --- Service Management ---
+SERVICE_LABEL="com.github.rightson.open-llm-router"
+PLIST_NAME="${SERVICE_LABEL}.plist"
+SOURCE_PLIST_PATH="./launchDaemons/${PLIST_NAME}"
+DEST_PLIST_PATH="/Library/LaunchDaemons/${PLIST_NAME}"
+LOG_PATH="/Users/rightson/workspace/github/rightson/open-llm-router/logs/open-llm-router.log"
+ERROR_LOG_PATH="/Users/rightson/workspace/github/rightson/open-llm-router/logs/open-llm-router.error.log"
+
+manage_service() {
+    sub_command="$1"
+
+    # Check for sudo access for commands that need it
+    if [[ "$sub_command" == "install" || "$sub_command" == "uninstall" || "$sub_command" == "start" || "$sub_command" == "stop" ]]; then
+        if [ "$(id -u)" -ne 0 ]; then
+            echo "❌ This command requires root privileges. Please run with sudo:"
+            echo "  sudo $0 service $sub_command"
+            exit 1
+        fi
+    fi
+
+    case "$sub_command" in
+        "install")
+            echo "🛠️  Installing service..."
+            if [ ! -f "$SOURCE_PLIST_PATH" ]; then
+                echo "❌ Source plist not found at: $SOURCE_PLIST_PATH"
+                exit 1
+            fi
+
+            echo "  -> Copying plist to $DEST_PLIST_PATH"
+            cp "$SOURCE_PLIST_PATH" "$DEST_PLIST_PATH"
+
+            echo "  -> Setting ownership to root:wheel"
+            chown root:wheel "$DEST_PLIST_PATH"
+
+            echo "  -> Loading service with launchctl..."
+            launchctl load "$DEST_PLIST_PATH"
+
+            echo "✅ Service installed and started successfully."
+            echo "   To check logs, run: $0 service logs"
+            ;;
+        "uninstall")
+            echo "🗑️  Uninstalling service..."
+            if [ -f "$DEST_PLIST_PATH" ]; then
+                echo "  -> Unloading service with launchctl..."
+                launchctl unload "$DEST_PLIST_PATH" 2>/dev/null || true
+
+                echo "  -> Removing plist file: $DEST_PLIST_PATH"
+                rm "$DEST_PLIST_PATH"
+                echo "✅ Service uninstalled."
+            else
+                echo "⚠️  Service not found at $DEST_PLIST_PATH. Nothing to do."
+            fi
+            ;;
+        "start")
+            echo "🚀 Starting service..."
+            if [ ! -f "$DEST_PLIST_PATH" ]; then
+                echo "❌ Service not installed. Run 'sudo $0 service install' first."
+                exit 1
+            fi
+            launchctl load "$DEST_PLIST_PATH"
+            echo "✅ Service started."
+            ;;
+        "stop")
+            echo "🛑 Stopping service..."
+            if [ ! -f "$DEST_PLIST_PATH" ]; then
+                echo "❌ Service not installed."
+                exit 1
+            fi
+            launchctl unload "$DEST_PLIST_PATH"
+            echo "✅ Service stopped."
+            ;;
+        "logs")
+            echo "📋 Tailing logs... (Press Ctrl+C to exit)"
+            echo "--- Standard Log: $LOG_PATH ---"
+            tail -f "$LOG_PATH"
+            ;;
+        "logs:error")
+            echo "📋 Tailing error logs... (Press Ctrl+C to exit)"
+            echo "--- Error Log: $ERROR_LOG_PATH ---"
+            tail -f "$ERROR_LOG_PATH"
+            ;;
+        *)
+            echo "Usage: $0 service {install|uninstall|start|stop|logs|logs:error}"
+            exit 1
+            ;;
+    esac
+}
+
 # Main command handling
 case "${1:-}" in
     "init")
@@ -383,8 +471,11 @@ case "${1:-}" in
     "status")
         check_status
         ;;
+    "service")
+        manage_service "${2:-}"
+        ;;
     *)
-        echo "Usage: $0 {init|start|stop|status}"
+        echo "Usage: $0 {init|start|stop|status|service}"
         echo ""
         echo "Commands:"
         echo "  init                       Generate SQL file from template"
@@ -396,10 +487,13 @@ case "${1:-}" in
         echo "  start llm-router [opts]     Start LLM Router only with extra options"
         echo "  stop                       Stop all PM2 services"
         echo "  status                     Check service status"
+        echo "  service <cmd>              Manage the launchd service"
+        echo "                             (install, uninstall, start, stop, logs)"
         echo ""
         echo "Examples:"
         echo "  $0 start llm-router --reload --log-level debug"
         echo "  $0 start open-webui --dev"
+        echo "  sudo $0 service install"
         exit 1
         ;;
 esac
