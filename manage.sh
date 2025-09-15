@@ -153,6 +153,7 @@ start_open_webui() {
     check_dependencies_open_webui
 
     echo "📊 Using database: $(echo $DATABASE_URL | cut -d'@' -f2 2>/dev/null || echo 'configured database')"
+    export DATABASE_URL=$DATABASE_URL
 
     # Start Open-WebUI with extra arguments
     if [ -n "$extra_args" ]; then
