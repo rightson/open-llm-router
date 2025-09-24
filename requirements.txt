@@ -1,6 +1,8 @@
 # Core dependencies
 python-dotenv
+psycopg2-binary
 open-webui
+itsdangerous
 
 # LLM Proxy dependencies
 fastapi>=0.100.0
