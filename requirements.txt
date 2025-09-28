@@ -8,6 +8,7 @@ itsdangerous
 fastapi>=0.100.0
 httpx>=0.24.0
 uvicorn[standard]>=0.23.0
+pyyaml>=6.0
 
 # Testing dependencies
 pytest>=7.0.0
