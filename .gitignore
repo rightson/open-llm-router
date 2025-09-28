@@ -12,9 +12,17 @@ build/
 *.egg-info
 
 # Configuration files (user-customizable)
+conf/config.yml
 conf/models.json
-conf/backends.json
 *.bak
+
+# Database and data files
+*.dump
+*.sql
+
+# Development files
+.vscode/
+launchDaemon/
 
 # Python cache files
 __pycache__/

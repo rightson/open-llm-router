@@ -5,6 +5,7 @@ Tests all backends defined in backends.json
 
 import pytest
 import json
+import yaml
 import os
 import importlib
 from unittest.mock import patch, MagicMock
@@ -21,29 +22,13 @@ class TestLLMRouter:
     """Test suite for LLM Router functionality"""
 
     def setup_class(self):
-        """Setup test class with backends configuration"""
+        """Setup test class with LiteLLM configuration"""
         self.client = TestClient(app)
 
-        # Load backends configuration
-        with open("conf/backends.json", "r") as f:
-            self.config = json.load(f)
-
-        # Handle new format configuration (providers -> backends conversion)
-        if "providers" in self.config:
-            self.backends = {}
-            for provider_name, provider_config in self.config["providers"].items():
-                self.backends[provider_name] = {
-                    "name": provider_config["name"],
-                    "base_url": provider_config["base_url"]
-                    + provider_config.get("endpoints", {}).get(
-                        "chat_completions", "/chat/completions"
-                    ),
-                    "api_key_env": provider_config["api_key_env"],
-                    "models": provider_config.get("models", []),
-                    "model_prefixes": provider_config.get("model_prefixes", []),
-                }
-        else:
-            self.backends = self.config["backends"]
+        # Load configuration using the same method as the application
+        from src.open_llm_router.utils.config import backend_config
+        self.config = backend_config.load_backends()
+        self.backends = self.config["backends"]
 
     def test_health_endpoint(self):
         """Test the health check endpoint"""

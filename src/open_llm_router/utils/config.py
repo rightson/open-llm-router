@@ -21,10 +21,8 @@ class BackendConfig:
 
         # Check for configuration files in order of preference
         config_files = [
-            project_root / "conf/config.yml",        # LiteLLM config.yml
-            project_root / "conf/config.yaml",       # LiteLLM config.yaml
-            project_root / "conf/backends.json",     # Current format
-            project_root / "conf/backends.example.json"  # Fallback
+            project_root / "conf/config.yml",        # LiteLLM config.yml (primary)
+            project_root / "conf/config.yaml",       # LiteLLM config.yaml (alternative)
         ]
 
         config_source = None
@@ -41,90 +39,34 @@ class BackendConfig:
                 break
 
         if config_source is None:
-            proxy_logger.warning(
-                "No backend config files found, using hardcoded fallback"
+            proxy_logger.error(
+                "No LiteLLM configuration file found. Please create conf/config.yml"
             )
-            config = self._get_fallback_config()
-            self._config = config
-            return config
+            proxy_logger.error(
+                "See conf/config.example.yml for a template or LITELLM_COMPATIBILITY.md for documentation"
+            )
+            raise FileNotFoundError("LiteLLM configuration file (config.yml/config.yaml) is required")
 
         try:
             with open(config_source, "r") as f:
-                if config_format == 'yaml':
-                    config = yaml.safe_load(f)
-                else:
-                    config = json.load(f)
+                config = yaml.safe_load(f)
                 proxy_logger.debug(f"Loaded config with keys: {list(config.keys())}")
         except Exception as e:
             proxy_logger.error(f"Failed to load config from {config_source}: {e}")
-            config = self._get_fallback_config()
+            raise
 
-        # Convert different formats to internal format
+        # Convert LiteLLM format to internal format
         if "model_list" in config:  # LiteLLM format
             config = self._convert_litellm_format(config)
-        elif "providers" in config:  # Current Open LLM Router format
-            config = self._convert_to_legacy_format(config)
-        # If neither, assume legacy format and use as-is
+        else:
+            proxy_logger.error("Invalid configuration: 'model_list' section is required in LiteLLM format")
+            proxy_logger.error("See conf/config.example.yml for correct format")
+            raise ValueError("Configuration must contain 'model_list' section with LiteLLM format")
 
         self._config = config
         return config
 
-    def _get_fallback_config(self) -> Dict[str, Any]:
-        """Return hardcoded fallback configuration"""
-        return {
-            "providers": {
-                "openai": {
-                    "name": "OpenAI",
-                    "base_url": "https://api.openai.com/v1",
-                    "api_key_env": "OPENAI_API_KEY",
-                    "endpoints": {"chat_completions": "/chat/completions"},
-                    "models": ["gpt-4", "gpt-3.5-turbo"],
-                    "model_prefixes": ["gpt-"],
-                },
-                "grok": {
-                    "name": "Groq",
-                    "base_url": "https://api.grok.com/openai/v1",
-                    "api_key_env": "GROK_API_KEY",
-                    "endpoints": {"chat_completions": "/chat/completions"},
-                    "models": ["llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
-                    "model_prefixes": ["llama", "mixtral"],
-                },
-            },
-            "model_aliases": {},
-            "default_models": {"chat": "gpt-3.5-turbo"},
-        }
 
-    def _convert_to_legacy_format(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert new provider format to legacy backend format for compatibility"""
-        proxy_logger.debug("Converting provider format to legacy backend format")
-
-        legacy_config = {
-            "backends": {},
-            "model_aliases": config.get("model_aliases", {}),
-            "default_models": config.get("default_models", {"chat": "gpt-3.5-turbo"}),
-        }
-
-        for provider_name, provider_config in config["providers"].items():
-            # Convert to legacy backend format
-            base_url = provider_config["base_url"]
-            chat_endpoint = provider_config.get("endpoints", {}).get(
-                "chat_completions", "/chat/completions"
-            )
-            full_url = base_url + chat_endpoint
-
-            legacy_config["backends"][provider_name] = {
-                "name": provider_config["name"],
-                "base_url": full_url,
-                "api_key_env": provider_config["api_key_env"],
-                "headers_template": {"Authorization": "Bearer {api_key}"},
-                "models": provider_config.get("models", []),
-                "model_prefixes": provider_config.get("model_prefixes", []),
-            }
-
-        proxy_logger.info(
-            f"Converted {len(config['providers'])} providers to legacy format"
-        )
-        return legacy_config
 
     def _convert_litellm_format(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Convert LiteLLM config.yml format to Open LLM Router internal format"""
@@ -205,28 +147,28 @@ class BackendConfig:
                 return {
                     "provider": "openai",
                     "model": model_name,
-                    "api_base": api_base or "https://api.openai.com/v1",
+                    "api_base": api_base or "https://api.openai.com/v1/chat/completions",
                     "api_key": api_key or "os.environ/OPENAI_API_KEY"
                 }
             elif provider_prefix in ["anthropic", "bedrock"] and "claude" in model_name:
                 return {
                     "provider": "claude",
                     "model": model_name,
-                    "api_base": api_base or "https://api.anthropic.com/v1",
+                    "api_base": api_base or "https://api.anthropic.com/v1/messages",
                     "api_key": api_key or "os.environ/CLAUDE_API_KEY"
                 }
             elif provider_prefix in ["vertex_ai", "gemini"]:
                 return {
                     "provider": "gemini",
                     "model": model_name,
-                    "api_base": api_base or "https://generativelanguage.googleapis.com/v1beta",
+                    "api_base": api_base or "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
                     "api_key": api_key or "os.environ/GEMINI_API_KEY"
                 }
             elif provider_prefix == "groq":
                 return {
                     "provider": "grok",
                     "model": model_name,
-                    "api_base": api_base or "https://api.x.ai/v1",
+                    "api_base": api_base or "https://api.x.ai/v1/chat/completions",
                     "api_key": api_key or "os.environ/GROK_API_KEY"
                 }
         else:
@@ -235,28 +177,28 @@ class BackendConfig:
                 return {
                     "provider": "openai",
                     "model": model_param,
-                    "api_base": api_base or "https://api.openai.com/v1",
+                    "api_base": api_base or "https://api.openai.com/v1/chat/completions",
                     "api_key": api_key or "os.environ/OPENAI_API_KEY"
                 }
             elif model_param.startswith("claude-"):
                 return {
                     "provider": "claude",
                     "model": model_param,
-                    "api_base": api_base or "https://api.anthropic.com/v1",
+                    "api_base": api_base or "https://api.anthropic.com/v1/messages",
                     "api_key": api_key or "os.environ/CLAUDE_API_KEY"
                 }
             elif model_param.startswith("gemini-"):
                 return {
                     "provider": "gemini",
                     "model": model_param,
-                    "api_base": api_base or "https://generativelanguage.googleapis.com/v1beta",
+                    "api_base": api_base or "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
                     "api_key": api_key or "os.environ/GEMINI_API_KEY"
                 }
             elif model_param.startswith("grok-"):
                 return {
                     "provider": "grok",
                     "model": model_param,
-                    "api_base": api_base or "https://api.x.ai/v1",
+                    "api_base": api_base or "https://api.x.ai/v1/chat/completions",
                     "api_key": api_key or "os.environ/GROK_API_KEY"
                 }
 
