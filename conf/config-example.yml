@@ -1,0 +1,84 @@
+# LiteLLM-compatible configuration for Open LLM Router
+# This file demonstrates how to configure the router using LiteLLM's config.yml format
+
+# Model configurations - this is the main section for defining models
+model_list:
+  # OpenAI models
+  - model_name: gpt-4o
+    litellm_params:
+      model: gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+      api_base: https://api.openai.com/v1
+
+  - model_name: gpt-4.1
+    litellm_params:
+      model: gpt-4.1
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: o3
+    litellm_params:
+      model: o3
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Groq models
+  - model_name: grok-4
+    litellm_params:
+      model: groq/grok-4-latest
+      api_key: os.environ/GROK_API_KEY
+      api_base: https://api.x.ai/v1
+
+  - model_name: grok-3
+    litellm_params:
+      model: groq/grok-3-latest
+      api_key: os.environ/GROK_API_KEY
+
+  # Anthropic Claude models
+  - model_name: claude-sonnet-4
+    litellm_params:
+      model: anthropic/claude-sonnet-4-20250514
+      api_key: os.environ/CLAUDE_API_KEY
+      api_base: https://api.anthropic.com/v1
+
+  - model_name: claude-opus-4.1
+    litellm_params:
+      model: anthropic/claude-opus-4-1-20250805
+      api_key: os.environ/CLAUDE_API_KEY
+
+  # Google Gemini models
+  - model_name: gemini-2.5
+    litellm_params:
+      model: vertex_ai/gemini-2.5-pro
+      api_key: os.environ/GEMINI_API_KEY
+      api_base: https://generativelanguage.googleapis.com/v1beta
+
+  - model_name: gemini-2.5-flash
+    litellm_params:
+      model: vertex_ai/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: gemini-2.5-flash-lite
+    litellm_params:
+      model: vertex_ai/gemini-2.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+
+# LiteLLM settings (optional)
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+  json_logs: true
+  request_timeout: 600
+
+# General settings (optional)
+general_settings:
+  master_key: sk-1234  # Optional master key for authentication
+  default_models:
+    chat: gpt-4.1
+    completion: gpt-4.1
+    embedding: text-embedding-ada-002
+
+# Router settings (optional)
+router_settings:
+  routing_strategy: simple-shuffle
+  model_group_alias:
+    gpt-4: ["gpt-4o", "gpt-4.1"]
+    claude: ["claude-sonnet-4", "claude-opus-4.1"]
