@@ -310,31 +310,6 @@ init_models() {
     echo "📝 Edit conf/models.json to customize your model configurations"
 }
 
-init_backends() {
-    echo "🔧 Initializing backends configuration..."
-
-    if [ ! -f "conf/backends.example.json" ]; then
-        echo "❌ conf/backends.example.json not found"
-        exit 1
-    fi
-
-    if [ -f "conf/backends.json" ]; then
-        echo "⚠️  conf/backends.json already exists. Backup created as conf/backends.json.bak"
-        cp conf/backends.json conf/backends.json.bak
-    fi
-
-    cp conf/backends.example.json conf/backends.json
-    echo "✅ Copied conf/backends.example.json to conf/backends.json"
-    echo "📝 Edit conf/backends.json to customize your backend and model configurations"
-
-    # Also migrate models.json if it exists
-    if [ -f "conf/models.json" ]; then
-        echo "⚠️  Found existing conf/models.json - consider migrating to conf/backends.json format"
-        echo "📋 Backup created as conf/models.json.bak.$(date +%s)"
-        cp conf/models.json "conf/models.json.bak.$(date +%s)"
-    fi
-}
-
 # --- Service Management ---
 SERVICE_LABEL="com.github.rightson.open-llm-router"
 PLIST_NAME="${SERVICE_LABEL}.plist"
@@ -428,8 +403,6 @@ case "${1:-}" in
     "init")
         if [ "${2:-}" = "models" ]; then
             init_models
-        elif [ "${2:-}" = "backends" ]; then
-            init_backends
         elif [ "${2:-}" = "--execute" ] || [ "${2:-}" = "-x" ]; then
             init_database
         else
@@ -481,7 +454,6 @@ case "${1:-}" in
         echo "  init                       Generate SQL file from template"
         echo "  init -x                    Generate and execute SQL file"
         echo "  init models                Initialize models.json from example (legacy)"
-        echo "  init backends              Initialize backends.json from example"
         echo "  start                      Start all services with PM2"
         echo "  start open-webui [opts]    Start Open-WebUI only with extra options"
         echo "  start llm-router [opts]     Start LLM Router only with extra options"

@@ -97,13 +97,10 @@ class GeminiProvider(BaseProvider):
             }
 
             # Construct the full URL with model name and endpoint type
-            # For Gemini, we need the original base_url from providers config, not the processed backend URL
-            original_config = self.backends_config.get("providers", {}).get(
-                "gemini", {}
-            )
-            gemini_base_url = original_config.get(
+            # Use the base_url from the converted backend configuration
+            gemini_base_url = self.backend.get(
                 "base_url", "https://generativelanguage.googleapis.com/v1beta"
-            )
+            ).rstrip("/")
             if stream:
                 # Use streaming endpoint
                 gemini_url = (

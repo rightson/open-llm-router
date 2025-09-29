@@ -1,15 +1,10 @@
 # LiteLLM Configuration Compatibility
 
-Open LLM Router now supports LiteLLM's `config.yml` format in addition to its native `backends.json` format. This provides seamless migration paths for users of both systems.
+Open LLM Router now standardizes on LiteLLM's `config.yml` format for all provider and model configuration. This document explains the supported fields and how to migrate from older JSON-based setups.
 
-## Configuration File Priority
+## Configuration File Location
 
-The router checks for configuration files in this order:
-
-1. `conf/config.yml` (LiteLLM format)
-2. `conf/config.yaml` (LiteLLM format)
-3. `conf/backends.json` (native format)
-4. `conf/backends.example.json` (fallback)
+Place your configuration at `conf/config.yml`. A `.yaml` extension is also accepted.
 
 ## LiteLLM Format Support
 
@@ -118,37 +113,9 @@ api_key: sk-actual-key-here
 2. Ensure environment variables are set
 3. Restart the router - no code changes needed
 
-### From Open LLM Router to LiteLLM Format
+### Migrating from legacy `backends.json`
 
-Convert your `backends.json` to `config.yml`:
-
-**Before (backends.json):**
-```json
-{
-  "providers": {
-    "openai": {
-      "name": "OpenAI",
-      "base_url": "https://api.openai.com/v1",
-      "api_key_env": "OPENAI_API_KEY",
-      "models": ["gpt-4o", "gpt-4.1"]
-    }
-  }
-}
-```
-
-**After (config.yml):**
-```yaml
-model_list:
-  - model_name: gpt-4o
-    litellm_params:
-      model: gpt-4o
-      api_key: os.environ/OPENAI_API_KEY
-
-  - model_name: gpt-4.1
-    litellm_params:
-      model: gpt-4.1
-      api_key: os.environ/OPENAI_API_KEY
-```
+Earlier versions shipped with a `backends.json` file. Convert each provider entry into the LiteLLM `model_list` format shown above, then save the result as `conf/config.yml`. The router no longer reads `backends.json`.
 
 ## Supported LiteLLM Features
 
@@ -170,14 +137,6 @@ model_list:
 - Complex routing strategies
 - Authentication beyond API keys
 
-## Backward Compatibility
-
-All existing Open LLM Router functionality remains unchanged:
-- Native `backends.json` format still works
-- All API endpoints remain the same
-- Model routing logic is preserved
-- Provider-specific features maintained
-
 ## Testing
 
 The compatibility layer includes comprehensive tests:
@@ -185,10 +144,6 @@ The compatibility layer includes comprehensive tests:
 ```bash
 # Test with LiteLLM config
 cp conf/config.example.yml conf/config.yml
-python -m pytest tests/test_llm_router.py -v
-
-# Test with native config
-rm conf/config.yml  # Falls back to backends.json
 python -m pytest tests/test_llm_router.py -v
 ```
 
