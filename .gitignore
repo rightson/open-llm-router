@@ -22,7 +22,9 @@ conf/models.json
 
 # Development files
 .vscode/
-launchDaemon/
+# Generated plist file (keep template only)
+launchDaemon/*.plist
+!launchDaemon/*.plist.template
 
 # Python cache files
 __pycache__/

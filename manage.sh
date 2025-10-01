@@ -3,6 +3,10 @@
 
 set -e
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Load environment variables
 if [ -f .env ]; then
     source .env
@@ -313,10 +317,11 @@ init_models() {
 # --- Service Management ---
 SERVICE_LABEL="com.github.rightson.open-llm-router"
 PLIST_NAME="${SERVICE_LABEL}.plist"
-SOURCE_PLIST_PATH="./launchDaemons/${PLIST_NAME}"
+SOURCE_PLIST_TEMPLATE="${SCRIPT_DIR}/launchDaemon/${PLIST_NAME}.template"
+SOURCE_PLIST_PATH="${SCRIPT_DIR}/launchDaemon/${PLIST_NAME}"
 DEST_PLIST_PATH="/Library/LaunchDaemons/${PLIST_NAME}"
-LOG_PATH="/Users/rightson/workspace/github/rightson/open-llm-router/logs/open-llm-router.log"
-ERROR_LOG_PATH="/Users/rightson/workspace/github/rightson/open-llm-router/logs/open-llm-router.error.log"
+LOG_PATH="${SCRIPT_DIR}/logs/open-llm-router.log"
+ERROR_LOG_PATH="${SCRIPT_DIR}/logs/open-llm-router.error.log"
 
 manage_service() {
     sub_command="$1"
@@ -333,10 +338,26 @@ manage_service() {
     case "$sub_command" in
         "install")
             echo "🛠️  Installing service..."
-            if [ ! -f "$SOURCE_PLIST_PATH" ]; then
-                echo "❌ Source plist not found at: $SOURCE_PLIST_PATH"
+
+            # Check if template exists
+            if [ ! -f "$SOURCE_PLIST_TEMPLATE" ]; then
+                echo "❌ Source plist template not found at: $SOURCE_PLIST_TEMPLATE"
                 exit 1
             fi
+
+            # Create logs directory if it doesn't exist
+            mkdir -p "${SCRIPT_DIR}/logs"
+
+            # Get current user
+            CURRENT_USER="${SUDO_USER:-$(whoami)}"
+
+            # Generate plist from template with actual paths
+            echo "  -> Generating plist with absolute paths..."
+            sed -e "s|{{WORKING_DIR}}|${SCRIPT_DIR}|g" \
+                -e "s|{{USER}}|${CURRENT_USER}|g" \
+                -e "s|{{LOG_PATH}}|${LOG_PATH}|g" \
+                -e "s|{{ERROR_LOG_PATH}}|${ERROR_LOG_PATH}|g" \
+                "$SOURCE_PLIST_TEMPLATE" > "$SOURCE_PLIST_PATH"
 
             echo "  -> Copying plist to $DEST_PLIST_PATH"
             cp "$SOURCE_PLIST_PATH" "$DEST_PLIST_PATH"
