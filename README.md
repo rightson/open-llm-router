@@ -34,7 +34,6 @@ Self-hosted LLM routing that's easy to run and maintain.
 **Infrastructure:**
 - **PostgreSQL Setup**: Pre-configured database initialization for Open-WebUI
 - **PM2 Management**: Simple service orchestration
-- **Environment-based Secrets**: API keys in `.env`, referenced in config
 
 ## Supported Providers
 
@@ -50,11 +49,11 @@ Works with any LiteLLM-supported provider. Common examples:
 ```bash
 # Setup environment
 cp .env.example .env
-# Edit .env with your API keys and database credentials
+# Edit .env with your database credentials
 
 # Configure router
 cp conf/config.example.yml conf/config.yml
-# Edit conf/config.yml to match your providers/models
+# Edit conf/config.yml with your API keys and models
 
 # Initialize database and start services
 ./manage.sh init -x
@@ -67,11 +66,6 @@ cp conf/config.example.yml conf/config.yml
 
 **1. Environment Variables (.env)**:
 ```env
-# API Keys (referenced by config.yml)
-OPENAI_API_KEY=your_openai_key
-CLAUDE_API_KEY=your_claude_key
-GEMINI_API_KEY=your_gemini_key
-
 # Database & Ports
 DATABASE_URL=postgresql://user:pass@localhost:5432/openwebui_db
 LLM_ROUTER_PORT=8086
@@ -84,12 +78,12 @@ model_list:
   - model_name: gpt-4.1
     litellm_params:
       model: gpt-4.1
-      api_key: os.environ/OPENAI_API_KEY
+      api_key: your_openai_key
 
   - model_name: claude-sonnet-4
     litellm_params:
       model: anthropic/claude-sonnet-4-20250514
-      api_key: os.environ/CLAUDE_API_KEY
+      api_key: your_claude_key
 ```
 
 **That's it!** Standard LiteLLM format - the router handles the rest automatically.
