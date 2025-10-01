@@ -1,6 +1,6 @@
 """
 Pytest tests for LLM Router API verification
-Tests all backends defined in backends.json
+Tests all backends defined in conf/config.yml
 """
 
 import pytest
@@ -165,25 +165,28 @@ class TestLLMRouter:
         elif backend_name == "gemini":
             assert "generateContent" in base_url
 
-    def test_backends_json_structure(self):
-        """Test the overall structure of backends.json"""
-        # Test top-level structure - support both old and new formats
-        assert "providers" in self.config or "backends" in self.config
-        assert "proxy" in self.config
-
-        # Test proxy configuration
-        proxy = self.config["proxy"]
-        required_proxy_fields = ["host", "port", "health_endpoint", "main_endpoint"]
-        for field in required_proxy_fields:
-            assert field in proxy
+    def test_backend_config_structure(self):
+        """Test the overall structure of converted LiteLLM configuration"""
+        assert "backends" in self.config
+        assert isinstance(self.backends, dict)
+        assert self.backends, "Expected at least one backend in configuration"
 
         # Test that all expected backends exist
         expected_backends = ["openai", "grok", "claude", "gemini"]
         for backend in expected_backends:
             assert backend in self.backends
 
+        # Each backend should expose standard fields
+        required_fields = {"name", "base_url", "api_key_env", "models"}
+        for backend_name, backend in self.backends.items():
+            missing_fields = required_fields - backend.keys()
+            assert not missing_fields, f"Backend {backend_name} missing {missing_fields}"
+
+        # Model aliases should be a dict (even if empty)
+        assert isinstance(self.config.get("model_aliases", {}), dict)
+
     def test_model_coverage(self):
-        """Test that models from backends.example.json are covered by routing logic"""
+        """Test that models from config.yml are covered by routing logic"""
         from src.open_llm_router.llm_router import choose_backend, BACKENDS_CONFIG
 
         # Test each backend's models from the loaded configuration

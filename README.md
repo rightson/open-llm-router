@@ -42,6 +42,10 @@ Simple, self-hosted LLM routing for Open-WebUI installations. Provides OpenAI-co
 cp .env.example .env
 # Edit .env with your API keys and database credentials
 
+# Configure router
+cp conf/config.example.yml conf/config.yml
+# Edit conf/config.yml to match your providers/models
+
 # Initialize database and start services
 ./manage.sh init -x
 ./manage.sh start
@@ -70,12 +74,28 @@ GEMINI_API_KEY=your_gemini_key
 GROK_API_KEY=your_grok_key
 ```
 
-**Backend Configuration**:
+**Router (conf/config.yml)**:
 ```bash
-# Initialize backends config
-./manage.sh init backends
-# Edit conf/backends.json for custom providers/models
+# Start from the LiteLLM-compatible template
+cp conf/config.example.yml conf/config.yml
+# List models and providers using LiteLLM's config.yml format
 ```
+
+```yaml
+model_list:
+  - model_name: gpt-4.1
+    litellm_params:
+      model: gpt-4.1
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: claude-sonnet-4
+    litellm_params:
+      model: anthropic/claude-sonnet-4-20250514
+      api_key: os.environ/CLAUDE_API_KEY
+```
+
+- Place the file at `conf/config.yml`; `conf/config.yaml` is also detected.
+- The router converts LiteLLM's structure to its internal backend format automatically.
+- See `LITELLM_COMPATIBILITY.md` for full format support and migration notes.
 
 ## Usage with Open-WebUI
 
@@ -89,15 +109,13 @@ GROK_API_KEY=your_grok_key
 
 - `POST /v1/chat/completions` - OpenAI-compatible chat (includes Claude with conversion)
 - `GET /v1/models` - List available models
-- `POST /admin/reload-backends` - Reload configuration
+- `POST /admin/reload-backends` - Reload `conf/config.yml` without restart
 
 ## Management Commands
 
 ```bash
 # Database
 ./manage.sh init -x          # Initialize database
-./manage.sh init backends    # Setup backend config
-
 # Services
 ./manage.sh start           # Start all services (PM2)
 ./manage.sh start llm-router # Start router only
