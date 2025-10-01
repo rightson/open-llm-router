@@ -1,39 +1,49 @@
-# Open LLM Router - Lightweight Router for Open-WebUI
+# Open LLM Router - LiteLLM-Compatible Router + Open-WebUI
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Simple, self-hosted LLM routing for Open-WebUI installations. Provides OpenAI-compatible API for 4 major providers with message format conversion.
+**Two main strengths:**
+1. **Lightweight LiteLLM-compatible router** - Drop in your existing LiteLLM config, minimal code
+2. **Open-WebUI with PostgreSQL** - Complete setup with database initialization and PM2 management
+
+Self-hosted LLM routing that's easy to run and maintain.
 
 ## When to Use This
 
 **✅ Good Fit:**
-- Small teams running Open-WebUI locally
-- Simple setups needing 4-5 providers (OpenAI, Groq, Claude, Gemini)
+- Need LiteLLM-compatible routing without the full LiteLLM stack
+- Want Open-WebUI with PostgreSQL pre-configured
+- Simple setups with minimal maintenance overhead
 - On-premises deployments with strict data control requirements
-- Minimal infrastructure and maintenance overhead preferred
+- Quick deployment with existing LiteLLM configs
 
 **❌ Consider Alternatives:**
-- **Production/Enterprise**: Use [OpenRouter.ai](https://openrouter.ai) (400+ models, automatic failover, enterprise features)
-- **Complex Routing**: Use [LiteLLM](https://litellm.ai) (100+ providers, load balancing, advanced features)
+- **Advanced Features**: Use [LiteLLM](https://litellm.ai) directly (100+ providers, load balancing, caching, observability)
+- **Zero Setup**: Use [OpenRouter.ai](https://openrouter.ai) (400+ models, automatic failover, no hosting)
 - **Single Provider**: Use Open-WebUI's native configuration
 
 ## Features
 
-- **Format Conversion**: Auto-converts OpenAI messages to Claude/Gemini formats
-- **Model Aliasing**: Smart routing (e.g., `claude-sonnet-4` → `claude-sonnet-4-20250514`)
-- **Streaming Compatibility**: Converts provider streaming to OpenAI SSE format
-- **Direct API Access**: No markup fees, full control over API keys
-- **Open-WebUI Integration**: Built-in PostgreSQL setup and PM2 management
+**Router:**
+- **LiteLLM Config Compatible**: Use existing LiteLLM `config.yml` files directly
+- **Minimal Code**: Lightweight implementation, easy to understand and maintain
+- **Auto Format Conversion**: OpenAI ↔ Claude/Gemini message formats
+- **Streaming Support**: Unified OpenAI-compatible SSE streaming
+- **Hot Reload**: Update config without restarting services
 
-## Supported Models (Limited Scope)
+**Infrastructure:**
+- **PostgreSQL Setup**: Pre-configured database initialization for Open-WebUI
+- **PM2 Management**: Simple service orchestration
+- **Environment-based Secrets**: API keys in `.env`, referenced in config
 
-**4 Providers, ~10 Models:**
-- **OpenAI**: `gpt-4o`, `gpt-4.1`, `o3`
-- **Groq**: `grok-4`, `grok-3`
-- **Claude**: `claude-opus-4.1`, `claude-sonnet-4` (with format conversion)
-- **Gemini**: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`
+## Supported Providers
 
-*For access to 400+ models, use [OpenRouter.ai](https://openrouter.ai) instead.*
+Works with any LiteLLM-supported provider. Common examples:
+- **OpenAI**: `gpt-4o`, `gpt-4.1`, `o3-mini`
+- **Anthropic**: `claude-opus-4`, `claude-sonnet-4`
+- **Google**: `gemini-2.0-flash`, `gemini-1.5-pro`
+- **xAI**: `grok-2`, `grok-beta`
+- **Many more**: See [LiteLLM providers](https://docs.litellm.ai/docs/providers)
 
 ## Quick Start
 
@@ -55,47 +65,36 @@ cp conf/config.example.yml conf/config.yml
 
 ## Configuration
 
-**Environment (.env)**:
+**1. Environment Variables (.env)**:
 ```env
-# Database
-OPENWEBUI_DB_USER=openwebui_user
-OPENWEBUI_DB_PASSWORD=your_password
-OPENWEBUI_DB_NAME=openwebui_db
-DATABASE_URL=postgresql://${OPENWEBUI_DB_USER}:${OPENWEBUI_DB_PASSWORD}@localhost:5432/${OPENWEBUI_DB_NAME}
-
-# Ports
-OPENWEBUI_PORT=8087
-LLM_ROUTER_PORT=8086
-
-# API Keys
+# API Keys (referenced by config.yml)
 OPENAI_API_KEY=your_openai_key
 CLAUDE_API_KEY=your_claude_key
 GEMINI_API_KEY=your_gemini_key
-GROK_API_KEY=your_grok_key
+
+# Database & Ports
+DATABASE_URL=postgresql://user:pass@localhost:5432/openwebui_db
+LLM_ROUTER_PORT=8086
+OPENWEBUI_PORT=8087
 ```
 
-**Router (conf/config.yml)**:
-```bash
-# Start from the LiteLLM-compatible template
-cp conf/config.example.yml conf/config.yml
-# List models and providers using LiteLLM's config.yml format
-```
-
+**2. LiteLLM Config (conf/config.yml)**:
 ```yaml
 model_list:
   - model_name: gpt-4.1
     litellm_params:
       model: gpt-4.1
       api_key: os.environ/OPENAI_API_KEY
+
   - model_name: claude-sonnet-4
     litellm_params:
       model: anthropic/claude-sonnet-4-20250514
       api_key: os.environ/CLAUDE_API_KEY
 ```
 
-- Place the file at `conf/config.yml`; `conf/config.yaml` is also detected.
-- The router converts LiteLLM's structure to its internal backend format automatically.
-- See `LITELLM_COMPATIBILITY.md` for full format support and migration notes.
+**That's it!** Standard LiteLLM format - the router handles the rest automatically.
+
+See `LITELLM_COMPATIBILITY.md` for advanced features and migration notes.
 
 ## Usage with Open-WebUI
 
@@ -143,32 +142,35 @@ curl -X POST http://localhost:8086/v1/chat/completions \
 
 ## Architecture
 
+**Minimal codebase** - easy to understand and maintain:
+
 ```
 src/open_llm_router/
-├── llm_router.py              # Main FastAPI app
-├── providers/                # Provider-specific implementations
-│   ├── claude.py            # Anthropic API with format conversion
-│   ├── gemini.py            # Google Gemini API integration
+├── llm_router.py              # Main FastAPI app (~300 lines)
+├── providers/                # Provider implementations
+│   ├── claude.py            # Anthropic format conversion
+│   ├── gemini.py            # Google Gemini integration
 │   └── openai.py            # OpenAI/compatible providers
-└── utils/                   # Utilities
-    ├── model_router.py      # Model routing and backend selection
-    └── logger.py            # Enhanced logging with timing
+└── utils/
+    ├── model_router.py      # LiteLLM config → backend routing
+    └── logger.py            # Request logging
 ```
 
-**Key Features**:
-- Provider-specific message format conversion
-- Basic model routing with aliases
-- OpenAI-compatible streaming for all providers
-- Enhanced logging with request timing and status codes
-- Template-based database initialization
+**Design Philosophy**:
+- LiteLLM config compatibility without the full stack
+- Automatic format conversion (OpenAI ↔ provider-specific)
+- Simple streaming aggregation
+- Hot-reloadable configuration
 
 ## Limitations
 
-- **Limited Scale**: 4 providers vs 400+ in OpenRouter.ai
-- **No Failover**: Single provider per model, no automatic fallback
-- **Basic Routing**: No intelligent load balancing or provider selection
-- **Maintenance Overhead**: Self-hosted setup and updates required
-- **Feature Gap**: Missing enterprise features (analytics, spend tracking, etc.)
+This is a **lightweight alternative**, not a full LiteLLM replacement:
+- **No Advanced Features**: Missing caching, load balancing, fallbacks, observability
+- **Basic Routing**: Single provider per model, no intelligent selection
+- **Self-Hosted**: You manage infrastructure and updates
+- **Limited Scale**: Best for small teams, not enterprise deployments
+
+For production needs, consider [LiteLLM](https://litellm.ai) or [OpenRouter.ai](https://openrouter.ai).
 
 ## License
 
