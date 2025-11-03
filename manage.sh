@@ -264,6 +264,36 @@ EOF
     echo "  pm2 delete all      # Delete services"
 }
 
+start_ollama() {
+    echo "🚀 Starting Ollama server..."
+
+    # Check if ollama is installed
+    if ! command -v ollama >/dev/null 2>&1; then
+        echo "❌ ollama not found. Please install Ollama first:"
+        echo "  https://ollama.ai/download"
+        exit 1
+    fi
+
+    # Export all OLLAMA_* environment variables from .env
+    echo "📋 Loading OLLAMA_* environment variables from .env..."
+    while IFS='=' read -r key value; do
+        # Skip comments and empty lines
+        [[ "$key" =~ ^#.*$ ]] && continue
+        [[ -z "$key" ]] && continue
+
+        # Only export variables that start with OLLAMA_
+        if [[ "$key" =~ ^OLLAMA_ ]]; then
+            # Remove any surrounding quotes from value
+            value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+            export "$key=$value"
+            echo "  ✓ $key"
+        fi
+    done < .env
+
+    echo "🔄 Starting ollama serve..."
+    exec ollama serve
+}
+
 stop_services() {
     echo "🛑 Stopping services..."
     pm2 delete open-webui llm-router 2>/dev/null || true
@@ -465,11 +495,14 @@ case "${1:-}" in
     "status")
         check_status
         ;;
+    "ollama")
+        start_ollama
+        ;;
     "service")
         manage_service "${2:-}"
         ;;
     *)
-        echo "Usage: $0 {init|start|stop|status|service}"
+        echo "Usage: $0 {init|start|stop|status|ollama|service}"
         echo ""
         echo "Commands:"
         echo "  init                       Generate SQL file from template"
@@ -477,15 +510,17 @@ case "${1:-}" in
         echo "  init models                Initialize models.json from example (legacy)"
         echo "  start                      Start all services with PM2"
         echo "  start open-webui [opts]    Start Open-WebUI only with extra options"
-        echo "  start llm-router [opts]     Start LLM Router only with extra options"
+        echo "  start llm-router [opts]    Start LLM Router only with extra options"
         echo "  stop                       Stop all PM2 services"
         echo "  status                     Check service status"
+        echo "  ollama                     Start Ollama server with OLLAMA_* env vars from .env"
         echo "  service <cmd>              Manage the launchd service"
         echo "                             (install, uninstall, start, stop, logs)"
         echo ""
         echo "Examples:"
         echo "  $0 start llm-router --reload --log-level debug"
         echo "  $0 start open-webui --dev"
+        echo "  $0 ollama"
         echo "  sudo $0 service install"
         exit 1
         ;;
