@@ -42,6 +42,8 @@ Works with any LiteLLM-supported provider. Common examples:
 - **Anthropic**: `claude-opus-4`, `claude-sonnet-4`
 - **Google**: `gemini-2.0-flash`, `gemini-1.5-pro`
 - **xAI**: `grok-2`, `grok-beta`
+- **Ollama**: Local models (auto-discovered via `scan-models`)
+- **LM Studio**: Local models (auto-discovered via `scan-models`)
 - **Many more**: See [LiteLLM providers](https://docs.litellm.ai/docs/providers)
 
 ## Quick Start
@@ -90,6 +92,36 @@ model_list:
 
 See `LITELLM_COMPATIBILITY.md` for advanced features and migration notes.
 
+## Model Discovery (Ollama & LM Studio)
+
+Automatically discover and configure local models from Ollama and LM Studio:
+
+```bash
+# Scan available models from Ollama and LM Studio
+./manage.sh scan-models
+
+# Scan and automatically update conf/config.yml
+./manage.sh scan-models ollama -u      # Ollama only
+./manage.sh scan-models lmstudio -u    # LM Studio only
+./manage.sh scan-models all -u         # Both services
+```
+
+**Prerequisites**:
+- **Ollama**: Must be running (`./manage.sh start ollama` or `ollama serve`)
+- **LM Studio**: Must have the server started in the LM Studio app
+
+**Environment Variables**:
+```env
+OLLAMA_HOST=http://localhost:11434      # Default Ollama endpoint
+LMSTUDIO_HOST=http://localhost:1234     # Default LM Studio endpoint
+```
+
+The scanner will:
+1. Query the respective service APIs for available models
+2. Generate LiteLLM-compatible configurations
+3. Update `conf/config.yml` with the discovered models
+4. Create a backup of your config before updating
+
 ## Usage with Open-WebUI
 
 1. Configure Open-WebUI connection:
@@ -109,11 +141,19 @@ See `LITELLM_COMPATIBILITY.md` for advanced features and migration notes.
 ```bash
 # Database
 ./manage.sh init -x          # Initialize database
+
 # Services
 ./manage.sh start           # Start all services (PM2)
 ./manage.sh start llm-router # Start router only
+./manage.sh start ollama    # Start Ollama server
 ./manage.sh stop           # Stop all services
 ./manage.sh status         # Check status
+
+# Model Discovery
+./manage.sh scan-models             # Scan all available models (Ollama + LM Studio)
+./manage.sh scan-models ollama      # Scan Ollama models only
+./manage.sh scan-models lmstudio    # Scan LM Studio models only
+./manage.sh scan-models ollama -u   # Scan and update conf/config.yml
 
 # PM2 Management
 pm2 logs                   # View logs

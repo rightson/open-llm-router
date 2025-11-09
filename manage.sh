@@ -198,8 +198,20 @@ start_all_services() {
     echo "🚀 Starting all services with PM2..."
     check_dependencies
 
+    # Check if ollama is installed
+    local ollama_available=false
+    if check_ollama_installed; then
+        ollama_available=true
+    else
+        echo "⚠️  Ollama not found. Skipping ollama service. Install from https://ollama.ai/download"
+    fi
+
     # Stop existing PM2 processes
-    pm2 delete open-webui llm-router 2>/dev/null || true
+    if [ "$ollama_available" = true ]; then
+        pm2 delete open-webui llm-router ollama 2>/dev/null || true
+    else
+        pm2 delete open-webui llm-router 2>/dev/null || true
+    fi
 
     # Start Open-WebUI with PM2
 
@@ -208,8 +220,73 @@ start_all_services() {
     # Ensure run directory exists
     mkdir -p run
 
+    # Collect OLLAMA_* environment variables from .env
+    ollama_env_vars=""
+    if [ "$ollama_available" = true ]; then
+        while IFS='=' read -r key value; do
+            # Skip comments and empty lines
+            [[ "$key" =~ ^#.*$ ]] && continue
+            [[ -z "$key" ]] && continue
+
+            # Only collect variables that start with OLLAMA_
+            if [[ "$key" =~ ^OLLAMA_ ]]; then
+                # Remove any surrounding quotes from value
+                value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+                ollama_env_vars="${ollama_env_vars}        ${key}: '${value}',\n"
+            fi
+        done < .env
+    fi
+
     # Create PM2 ecosystem file
-    cat > run/ecosystem.config.js << EOF
+    if [ "$ollama_available" = true ]; then
+        cat > run/ecosystem.config.js << EOF
+module.exports = {
+  apps: [
+    {
+      name: 'open-webui',
+      script: './venv/bin/open-webui',
+      args: 'serve --port ${OPENWEBUI_PORT:-8087}',
+      interpreter: './venv/bin/python',
+      env: {
+        DATABASE_URL: '${DATABASE_URL}',
+        OPENAI_API_KEY: '${OPENAI_API_KEY:-}',
+        NODE_ENV: 'production'
+      },
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '2G'
+    },
+    {
+      name: 'llm-router',
+      script: './venv/bin/python',
+      args: '-m uvicorn src.open_llm_router.llm_router:app --host ${LLM_ROUTER_HOST:-localhost} --port ${LLM_ROUTER_PORT:-8086}',
+      env: {
+        OPENAI_API_KEY: '${OPENAI_API_KEY:-}',
+        GROK_API_KEY: '${GROK_API_KEY:-}',
+        CLAUDE_API_KEY: '${CLAUDE_API_KEY:-}',
+        GEMINI_API_KEY: '${GEMINI_API_KEY:-}',
+        NODE_ENV: 'production'
+      },
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M'
+    },
+    {
+      name: 'ollama',
+      script: 'ollama',
+      args: 'serve',
+      env: {
+$(echo -e "$ollama_env_vars")        NODE_ENV: 'production'
+      },
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '2G'
+    }
+  ]
+};
+EOF
+    else
+        cat > run/ecosystem.config.js << EOF
 module.exports = {
   apps: [
     {
@@ -244,6 +321,7 @@ module.exports = {
   ]
 };
 EOF
+    fi
 
     # Start services
     pm2 start run/ecosystem.config.js
@@ -255,6 +333,9 @@ EOF
     echo "📊 Access points:"
     echo "  Open-WebUI: http://localhost:${OPENWEBUI_PORT:-8087}"
     echo "  LLM Router: http://localhost:${LLM_ROUTER_PORT:-8086}"
+    if [ "$ollama_available" = true ]; then
+        echo "  Ollama: http://localhost:${OLLAMA_HOST:-11434}"
+    fi
     echo ""
     echo "PM2 commands:"
     echo "  pm2 status          # Check status"
@@ -294,9 +375,18 @@ start_ollama() {
     exec ollama serve
 }
 
+check_ollama_installed() {
+    if ! command -v ollama >/dev/null 2>&1; then
+        echo "❌ ollama not found. Please install Ollama first:"
+        echo "  https://ollama.ai/download"
+        return 1
+    fi
+    return 0
+}
+
 stop_services() {
     echo "🛑 Stopping services..."
-    pm2 delete open-webui llm-router 2>/dev/null || true
+    pm2 delete open-webui llm-router ollama 2>/dev/null || true
     echo "✅ All services stopped"
 }
 
@@ -342,6 +432,267 @@ init_models() {
     cp conf/models.example.json conf/models.json
     echo "✅ Copied conf/models.example.json to conf/models.json"
     echo "📝 Edit conf/models.json to customize your model configurations"
+}
+
+scan_ollama_models() {
+    echo "🔍 Scanning Ollama models..."
+
+    # Check if ollama is installed
+    if ! command -v ollama >/dev/null 2>&1; then
+        echo "⚠️  Ollama not found. Skipping Ollama scan."
+        echo "   Install from https://ollama.ai/download"
+        return 1
+    fi
+
+    # Get OLLAMA_HOST from environment or use default
+    local ollama_host="${OLLAMA_HOST:-http://localhost:11434}"
+
+    # Try to list models via API
+    local response=$(curl -s "${ollama_host}/api/tags" 2>/dev/null)
+
+    if [ $? -ne 0 ] || [ -z "$response" ]; then
+        echo "⚠️  Could not connect to Ollama at ${ollama_host}"
+        echo "   Make sure Ollama is running: ./manage.sh start ollama"
+        return 1
+    fi
+
+    # Extract model names using Python (more reliable than jq which might not be installed)
+    local models=$(echo "$response" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    models = data.get('models', [])
+    for model in models:
+        print(model.get('name', ''))
+except:
+    pass
+" 2>/dev/null)
+
+    if [ -z "$models" ]; then
+        echo "⚠️  No Ollama models found"
+        return 1
+    fi
+
+    echo "✅ Found Ollama models:"
+    echo "$models" | while read -r model; do
+        [ -n "$model" ] && echo "   - $model"
+    done
+
+    echo "$models"
+    return 0
+}
+
+scan_lmstudio_models() {
+    echo "🔍 Scanning LM Studio models..."
+
+    # Get LM Studio host from environment or use default
+    local lmstudio_host="${LMSTUDIO_HOST:-http://localhost:1234}"
+
+    # Try to list models via OpenAI-compatible API
+    local response=$(curl -s "${lmstudio_host}/v1/models" 2>/dev/null)
+
+    if [ $? -ne 0 ] || [ -z "$response" ]; then
+        echo "⚠️  Could not connect to LM Studio at ${lmstudio_host}"
+        echo "   Make sure LM Studio is running with the server started"
+        return 1
+    fi
+
+    # Extract model IDs using Python
+    local models=$(echo "$response" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    models = data.get('data', [])
+    for model in models:
+        print(model.get('id', ''))
+except:
+    pass
+" 2>/dev/null)
+
+    if [ -z "$models" ]; then
+        echo "⚠️  No LM Studio models found"
+        return 1
+    fi
+
+    echo "✅ Found LM Studio models:"
+    echo "$models" | while read -r model; do
+        [ -n "$model" ] && echo "   - $model"
+    done
+
+    echo "$models"
+    return 0
+}
+
+update_config_with_models() {
+    local service="$1"
+    shift
+    local models=("$@")
+
+    if [ ${#models[@]} -eq 0 ]; then
+        echo "⚠️  No models to add"
+        return 1
+    fi
+
+    local config_file="conf/config.yml"
+
+    if [ ! -f "$config_file" ]; then
+        echo "❌ $config_file not found. Creating from example..."
+        if [ -f "conf/config.example.yml" ]; then
+            cp conf/config.example.yml "$config_file"
+        else
+            echo "❌ conf/config.example.yml not found"
+            return 1
+        fi
+    fi
+
+    # Backup config file with timestamp
+    local timestamp=$(date +"%Y%m%d_%H%M%S")
+    local backup_file="${config_file}.${timestamp}.bak"
+    cp "$config_file" "$backup_file"
+    echo "📦 Backup created: $backup_file"
+
+    # Use Python to update the YAML file
+    python3 << EOF
+import yaml
+import sys
+from pathlib import Path
+
+config_file = "$config_file"
+service = "$service"
+models = [m.strip() for m in """${models[*]}""".split() if m.strip()]
+
+try:
+    # Load existing config
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f) or {}
+
+    # Ensure model_list exists
+    if 'model_list' not in config:
+        config['model_list'] = []
+
+    # Determine API parameters based on service
+    if service == "ollama":
+        api_base = "${OLLAMA_HOST:-http://localhost:11434}"
+        model_prefix = "ollama/"
+    elif service == "lmstudio":
+        api_base = "${LMSTUDIO_HOST:-http://localhost:1234}"
+        model_prefix = "openai/"
+    else:
+        print(f"❌ Unknown service: {service}")
+        sys.exit(1)
+
+    # Track existing model names
+    existing_models = {m.get('model_name', ''): i for i, m in enumerate(config['model_list'])}
+
+    # Add or update models
+    added_count = 0
+    updated_count = 0
+
+    for model in models:
+        if not model:
+            continue
+
+        # Clean model name for display
+        model_display_name = model.replace(':', '-').replace('/', '-')
+
+        model_entry = {
+            'model_name': model_display_name,
+            'litellm_params': {
+                'model': f"{model_prefix}{model}",
+                'api_base': api_base
+            }
+        }
+
+        # Add custom_llm_provider for Ollama
+        if service == "ollama":
+            model_entry['litellm_params']['custom_llm_provider'] = 'ollama'
+
+        # Check if model already exists
+        if model_display_name in existing_models:
+            # Update existing entry
+            idx = existing_models[model_display_name]
+            config['model_list'][idx] = model_entry
+            updated_count += 1
+        else:
+            # Add new entry
+            config['model_list'].append(model_entry)
+            added_count += 1
+
+    # Write updated config
+    with open(config_file, 'w') as f:
+        yaml.dump(config, f, default_flow_style=False, sort_keys=False, indent=2)
+
+    print(f"✅ Config updated: {added_count} models added, {updated_count} models updated")
+
+except Exception as e:
+    print(f"❌ Error updating config: {e}")
+    sys.exit(1)
+EOF
+
+    if [ $? -eq 0 ]; then
+        echo "✅ Successfully updated $config_file"
+        return 0
+    else
+        echo "❌ Failed to update config"
+        return 1
+    fi
+}
+
+scan_models() {
+    local service="${1:-all}"
+    local update_config="${2:-false}"
+
+    echo "🔍 Scanning for available models..."
+    echo ""
+
+    local ollama_models=()
+    local lmstudio_models=()
+
+    # Scan Ollama if requested
+    if [ "$service" = "all" ] || [ "$service" = "ollama" ]; then
+        local ollama_output=$(scan_ollama_models)
+        local ollama_status=$?
+
+        if [ $ollama_status -eq 0 ]; then
+            # Read models into array
+            while IFS= read -r line; do
+                [ -n "$line" ] && ollama_models+=("$line")
+            done <<< "$(echo "$ollama_output" | grep -v "^🔍\|^✅\|^⚠️\|^   -")"
+        fi
+        echo ""
+    fi
+
+    # Scan LM Studio if requested
+    if [ "$service" = "all" ] || [ "$service" = "lmstudio" ]; then
+        local lmstudio_output=$(scan_lmstudio_models)
+        local lmstudio_status=$?
+
+        if [ $lmstudio_status -eq 0 ]; then
+            # Read models into array
+            while IFS= read -r line; do
+                [ -n "$line" ] && lmstudio_models+=("$line")
+            done <<< "$(echo "$lmstudio_output" | grep -v "^🔍\|^✅\|^⚠️\|^   -")"
+        fi
+        echo ""
+    fi
+
+    # Update config if requested
+    if [ "$update_config" = "true" ] || [ "$update_config" = "--update" ] || [ "$update_config" = "-u" ]; then
+        if [ ${#ollama_models[@]} -gt 0 ]; then
+            echo "📝 Updating config.yml with Ollama models..."
+            update_config_with_models "ollama" "${ollama_models[@]}"
+            echo ""
+        fi
+
+        if [ ${#lmstudio_models[@]} -gt 0 ]; then
+            echo "📝 Updating config.yml with LM Studio models..."
+            update_config_with_models "lmstudio" "${lmstudio_models[@]}"
+            echo ""
+        fi
+    else
+        echo "💡 To update conf/config.yml with these models, run:"
+        echo "   $0 scan-models $service --update"
+    fi
 }
 
 # --- Service Management ---
@@ -472,19 +823,24 @@ case "${1:-}" in
                 shift 2  # Remove 'start' and 'llm-router'
                 start_llm_router "$@"
                 ;;
+            "ollama")
+                start_ollama
+                ;;
             "")
                 start_all_services
                 ;;
             *)
-                echo "Usage: $0 start [open-webui|llm-router] [extra-options...]"
+                echo "Usage: $0 start [open-webui|llm-router|ollama] [extra-options...]"
                 echo ""
-                echo "  start                      Start all services with PM2"
+                echo "  start                      Start all services with PM2 (open-webui, llm-router, ollama)"
                 echo "  start open-webui [opts]    Start Open-WebUI only with extra options"
-                echo "  start llm-router [opts]     Start LLM Router only with extra options"
+                echo "  start llm-router [opts]    Start LLM Router only with extra options"
+                echo "  start ollama               Start Ollama server only (no PM2)"
                 echo ""
                 echo "Examples:"
                 echo "  $0 start llm-router --reload --log-level debug"
                 echo "  $0 start open-webui --dev"
+                echo "  $0 start ollama"
                 exit 1
                 ;;
         esac
@@ -495,32 +851,39 @@ case "${1:-}" in
     "status")
         check_status
         ;;
-    "ollama")
-        start_ollama
-        ;;
     "service")
         manage_service "${2:-}"
         ;;
+    "scan-models")
+        scan_models "${2:-all}" "${3:-false}"
+        ;;
     *)
-        echo "Usage: $0 {init|start|stop|status|ollama|service}"
+        echo "Usage: $0 {init|start|stop|status|scan-models|service}"
         echo ""
         echo "Commands:"
         echo "  init                       Generate SQL file from template"
         echo "  init -x                    Generate and execute SQL file"
         echo "  init models                Initialize models.json from example (legacy)"
-        echo "  start                      Start all services with PM2"
+        echo "  start                      Start all services with PM2 (open-webui, llm-router, ollama)"
         echo "  start open-webui [opts]    Start Open-WebUI only with extra options"
         echo "  start llm-router [opts]    Start LLM Router only with extra options"
+        echo "  start ollama               Start Ollama server only (no PM2)"
         echo "  stop                       Stop all PM2 services"
         echo "  status                     Check service status"
-        echo "  ollama                     Start Ollama server with OLLAMA_* env vars from .env"
+        echo "  scan-models [service] [-u] Scan available models from Ollama/LM Studio"
+        echo "                             service: all (default), ollama, or lmstudio"
+        echo "                             -u, --update: Update conf/config.yml"
         echo "  service <cmd>              Manage the launchd service"
         echo "                             (install, uninstall, start, stop, logs)"
         echo ""
         echo "Examples:"
+        echo "  $0 start                   # Start all services with PM2"
         echo "  $0 start llm-router --reload --log-level debug"
         echo "  $0 start open-webui --dev"
-        echo "  $0 ollama"
+        echo "  $0 start ollama            # Start ollama directly (no PM2)"
+        echo "  $0 scan-models             # Scan all available models"
+        echo "  $0 scan-models ollama -u   # Scan Ollama and update config.yml"
+        echo "  $0 scan-models lmstudio -u # Scan LM Studio and update config.yml"
         echo "  sudo $0 service install"
         exit 1
         ;;
