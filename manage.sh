@@ -198,95 +198,18 @@ start_all_services() {
     echo "🚀 Starting all services with PM2..."
     check_dependencies
 
-    # Check if ollama is installed
-    local ollama_available=false
-    if check_ollama_installed; then
-        ollama_available=true
-    else
-        echo "⚠️  Ollama not found. Skipping ollama service. Install from https://ollama.ai/download"
-    fi
-
     # Stop existing PM2 processes
-    if [ "$ollama_available" = true ]; then
-        pm2 delete open-webui llm-router ollama 2>/dev/null || true
-    else
-        pm2 delete open-webui llm-router 2>/dev/null || true
-    fi
+    pm2 delete open-webui llm-router 2>/dev/null || true
 
-    # Start Open-WebUI with PM2
+    # Start Open-WebUI and LLM Router with PM2
 
     echo "📊 Using database: $(echo $DATABASE_URL | cut -d'@' -f2 2>/dev/null || echo 'configured database')"
 
     # Ensure run directory exists
     mkdir -p run
 
-    # Collect OLLAMA_* environment variables from .env
-    ollama_env_vars=""
-    if [ "$ollama_available" = true ]; then
-        while IFS='=' read -r key value; do
-            # Skip comments and empty lines
-            [[ "$key" =~ ^#.*$ ]] && continue
-            [[ -z "$key" ]] && continue
-
-            # Only collect variables that start with OLLAMA_
-            if [[ "$key" =~ ^OLLAMA_ ]]; then
-                # Remove any surrounding quotes from value
-                value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
-                ollama_env_vars="${ollama_env_vars}        ${key}: '${value}',\n"
-            fi
-        done < .env
-    fi
-
     # Create PM2 ecosystem file
-    if [ "$ollama_available" = true ]; then
-        cat > run/ecosystem.config.js << EOF
-module.exports = {
-  apps: [
-    {
-      name: 'open-webui',
-      script: './venv/bin/open-webui',
-      args: 'serve --port ${OPENWEBUI_PORT:-8087}',
-      interpreter: './venv/bin/python',
-      env: {
-        DATABASE_URL: '${DATABASE_URL}',
-        OPENAI_API_KEY: '${OPENAI_API_KEY:-}',
-        NODE_ENV: 'production'
-      },
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '2G'
-    },
-    {
-      name: 'llm-router',
-      script: './venv/bin/python',
-      args: '-m uvicorn src.open_llm_router.llm_router:app --host ${LLM_ROUTER_HOST:-localhost} --port ${LLM_ROUTER_PORT:-8086}',
-      env: {
-        OPENAI_API_KEY: '${OPENAI_API_KEY:-}',
-        GROK_API_KEY: '${GROK_API_KEY:-}',
-        CLAUDE_API_KEY: '${CLAUDE_API_KEY:-}',
-        GEMINI_API_KEY: '${GEMINI_API_KEY:-}',
-        NODE_ENV: 'production'
-      },
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '500M'
-    },
-    {
-      name: 'ollama',
-      script: 'ollama',
-      args: 'serve',
-      env: {
-$(echo -e "$ollama_env_vars")        NODE_ENV: 'production'
-      },
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '2G'
-    }
-  ]
-};
-EOF
-    else
-        cat > run/ecosystem.config.js << EOF
+    cat > run/ecosystem.config.js << EOF
 module.exports = {
   apps: [
     {
@@ -321,7 +244,6 @@ module.exports = {
   ]
 };
 EOF
-    fi
 
     # Start services
     pm2 start run/ecosystem.config.js
@@ -333,9 +255,6 @@ EOF
     echo "📊 Access points:"
     echo "  Open-WebUI: http://localhost:${OPENWEBUI_PORT:-8087}"
     echo "  LLM Router: http://localhost:${LLM_ROUTER_PORT:-8086}"
-    if [ "$ollama_available" = true ]; then
-        echo "  Ollama: http://localhost:${OLLAMA_HOST:-11434}"
-    fi
     echo ""
     echo "PM2 commands:"
     echo "  pm2 status          # Check status"
@@ -701,8 +620,9 @@ PLIST_NAME="${SERVICE_LABEL}.plist"
 SOURCE_PLIST_TEMPLATE="${SCRIPT_DIR}/launchDaemon/${PLIST_NAME}.template"
 SOURCE_PLIST_PATH="${SCRIPT_DIR}/launchDaemon/${PLIST_NAME}"
 DEST_PLIST_PATH="/Library/LaunchDaemons/${PLIST_NAME}"
-LOG_PATH="${SCRIPT_DIR}/logs/open-llm-router.log"
-ERROR_LOG_PATH="${SCRIPT_DIR}/logs/open-llm-router.error.log"
+LOG_DIR="${OPEN_LLM_ROUTER_LOG_DIR:-${SCRIPT_DIR}/logs}"
+LOG_PATH="${LOG_DIR}/open-llm-router.log"
+ERROR_LOG_PATH="${LOG_DIR}/open-llm-router.error.log"
 
 manage_service() {
     sub_command="$1"
@@ -727,7 +647,7 @@ manage_service() {
             fi
 
             # Create logs directory if it doesn't exist
-            mkdir -p "${SCRIPT_DIR}/logs"
+            mkdir -p "${LOG_DIR}"
 
             # Get current user
             CURRENT_USER="${SUDO_USER:-$(whoami)}"
@@ -832,7 +752,7 @@ case "${1:-}" in
             *)
                 echo "Usage: $0 start [open-webui|llm-router|ollama] [extra-options...]"
                 echo ""
-                echo "  start                      Start all services with PM2 (open-webui, llm-router, ollama)"
+                echo "  start                      Start Open-WebUI and LLM Router with PM2"
                 echo "  start open-webui [opts]    Start Open-WebUI only with extra options"
                 echo "  start llm-router [opts]    Start LLM Router only with extra options"
                 echo "  start ollama               Start Ollama server only (no PM2)"
@@ -864,7 +784,7 @@ case "${1:-}" in
         echo "  init                       Generate SQL file from template"
         echo "  init -x                    Generate and execute SQL file"
         echo "  init models                Initialize models.json from example (legacy)"
-        echo "  start                      Start all services with PM2 (open-webui, llm-router, ollama)"
+        echo "  start                      Start Open-WebUI and LLM Router with PM2"
         echo "  start open-webui [opts]    Start Open-WebUI only with extra options"
         echo "  start llm-router [opts]    Start LLM Router only with extra options"
         echo "  start ollama               Start Ollama server only (no PM2)"
@@ -877,7 +797,7 @@ case "${1:-}" in
         echo "                             (install, uninstall, start, stop, logs)"
         echo ""
         echo "Examples:"
-        echo "  $0 start                   # Start all services with PM2"
+        echo "  $0 start                   # Start Open-WebUI and LLM Router with PM2"
         echo "  $0 start llm-router --reload --log-level debug"
         echo "  $0 start open-webui --dev"
         echo "  $0 start ollama            # Start ollama directly (no PM2)"
