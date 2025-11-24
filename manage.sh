@@ -759,7 +759,6 @@ case "${1:-}" in
                 echo ""
                 echo "Examples:"
                 echo "  $0 start llm-router --reload --log-level debug"
-                echo "  $0 start open-webui --dev"
                 echo "  $0 start ollama"
                 exit 1
                 ;;
@@ -799,7 +798,6 @@ case "${1:-}" in
         echo "Examples:"
         echo "  $0 start                   # Start Open-WebUI and LLM Router with PM2"
         echo "  $0 start llm-router --reload --log-level debug"
-        echo "  $0 start open-webui --dev"
         echo "  $0 start ollama            # Start ollama directly (no PM2)"
         echo "  $0 scan-models             # Scan all available models"
         echo "  $0 scan-models ollama -u   # Scan Ollama and update config.yml"
